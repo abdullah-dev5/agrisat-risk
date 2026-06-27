@@ -18,7 +18,7 @@
 | M6 | **Fusion & storage** — tier selection, time-series persist | FR-3.4, FR-3.8–3.9 | `feat/m6-fusion` | Core logic done |
 | M7 | **Baseline engine** — multi-year, growth-stage stats | FR-4.x | `feat/m7-baseline` | Demo baseline done |
 | M8 | **Risk scoring** — z-score, rainfall cross-check, audit | FR-5.1–5.4 | `feat/m8-risk-scoring` | Core done |
-| M9 | **Dashboard UI** — map, charts, flags, list views | FR-6.x, NFR-1, NFR-8 | `feat/m9-dashboard-ui` | Functional · redesign pending |
+| M9 | **Dashboard UI** — map, charts, flags, list views | FR-6.x, NFR-1, NFR-8 | `feat/m9-dashboard-ui` | Canopy design system · pnpm |
 | M10 | **Reporting** — PDF field report, CSV portfolio | FR-7.x | `feat/m10-reporting` | Basic export done |
 | M11 | **Supabase production setup** — migrations, secrets, RLS test | NFR-4 | `chore/m11-supabase-setup` | In progress |
 | M12 | **ML layer (post-MVP)** — gradient-boosted model | FR-5.5 | `feat/m12-ml-risk` | Planned |

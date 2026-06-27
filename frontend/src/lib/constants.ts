@@ -1,26 +1,31 @@
 import type { RiskTier } from '../types';
 
+/** Refined risk palette — institutional, not neon dashboard defaults */
 export const RISK_COLORS: Record<RiskTier, string> = {
-  normal: '#22c55e',
-  watch: '#eab308',
-  elevated: '#f97316',
-  high: '#ef4444',
-  insufficient_data: '#94a3b8',
+  normal: '#3D6B5A',
+  watch: '#B8954A',
+  elevated: '#C4652E',
+  high: '#9B2C2C',
+  insufficient_data: '#8A8580',
 };
 
 export const RISK_LABELS: Record<RiskTier, string> = {
   normal: 'Normal',
   watch: 'Watch',
-  elevated: 'Elevated Risk',
+  elevated: 'Elevated',
   high: 'High Risk',
-  insufficient_data: 'Insufficient Data',
+  insufficient_data: 'No Data',
 };
 
 export const TIER_LABELS: Record<string, string> = {
-  tier1_planet: 'Tier 1 — PlanetScope',
-  tier2_sen2sr: 'Tier 2 — SEN2SR',
-  tier3_sar: 'Tier 3 — SAR',
+  tier1_planet: 'PlanetScope · 3m',
+  tier2_sen2sr: 'SEN2SR · 2.5m',
+  tier3_sar: 'Sentinel-1 SAR',
 };
 
 export const PILOT_CROP = 'wheat';
-export const PILOT_DISTRICT = 'Faisalabad District, Punjab';
+export const PILOT_DISTRICT = 'Faisalabad District';
+export const PILOT_REGION = 'Punjab, Pakistan';
+
+export const MAP_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+export const MAP_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';

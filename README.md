@@ -7,7 +7,7 @@ Satellite-based parametric crop risk platform for agricultural lenders and insur
 ## Architecture
 
 ```
-frontend/     React 18 + TypeScript + Leaflet dashboard
+frontend/     React 18 + TypeScript + Leaflet dashboard (pnpm)
 backend/      Python FastAPI — tier adapters, fusion, risk scoring
 supabase/     PostgreSQL + PostGIS, Auth, RLS, report storage
 ```
@@ -27,6 +27,7 @@ Core risk flagging works on Tier 3 alone (FR-3.7).
 ### Prerequisites
 
 - Node.js 20+
+- pnpm 9+ (`npm install -g pnpm`)
 - Python 3.11+
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (optional, for local DB)
 - Google Earth Engine service account (Tier 3 pipeline)
@@ -56,8 +57,8 @@ uvicorn app.main:app --reload --port 8000
 
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Open http://localhost:5173
