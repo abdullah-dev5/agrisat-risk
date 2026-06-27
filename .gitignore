@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & cache
+*.log
+.cache/
+.pytest_cache/
+
+# Earth Engine credentials (never commit)
+*-gee-key.json
+service-account*.json
+
+# Reports temp
+backend/reports/*.pdf

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Strips Cursor co-author trailers before a commit is finalized.
+# Install: run scripts/install-git-hook.ps1 from repo root
+
+MSG_FILE="$1"
+
+if [ -f "$MSG_FILE" ]; then
+  grep -v -i 'cursoragent@cursor.com' "$MSG_FILE" > "$MSG_FILE.tmp" 2>/dev/null || true
+  if [ -f "$MSG_FILE.tmp" ]; then
+    mv "$MSG_FILE.tmp" "$MSG_FILE"
+  fi
+fi
+
+exit 0
