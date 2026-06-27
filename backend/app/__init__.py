@@ -1,0 +1,1 @@
+"""AgriSat Risk backend application."""
