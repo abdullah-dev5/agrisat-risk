@@ -14,18 +14,30 @@ from app.services.geometry import compute_area_hectares, geojson_polygon, geojso
 from app.services.risk_engine import assess_risk
 
 
-def _boundary_from_row(row: dict) -> dict[str, Any]:
+def _fetch_boundary_geojson(sb, field_id: str) -> dict[str, Any]:
+    try:
+        resp = sb.rpc("field_boundary_geojson", {"p_field_id": field_id}).execute()
+        if resp.data:
+            return resp.data
+    except Exception:
+        pass
+    return {"type": "Polygon", "coordinates": []}
+
+
+def _boundary_from_row(sb, row: dict) -> dict[str, Any]:
     if isinstance(row.get("boundary"), dict):
         return row["boundary"]
-    return row.get("boundary_geojson", {"type": "Polygon", "coordinates": []})
+    if row.get("boundary_geojson"):
+        return row["boundary_geojson"]
+    return _fetch_boundary_geojson(sb, row["id"])
 
 
-def _field_response(row: dict, risk_tier: str | None = None) -> FieldResponse:
+def _field_response(sb, row: dict, risk_tier: str | None = None) -> FieldResponse:
     return FieldResponse(
         id=row["id"],
         institution_id=row["institution_id"],
         name=row.get("name"),
-        boundary_geojson=_boundary_from_row(row),
+        boundary_geojson=_boundary_from_row(sb, row),
         area_hectares=float(row["area_hectares"]) if row.get("area_hectares") else None,
         crop_type=row["crop_type"],
         sowing_date=date.fromisoformat(str(row["sowing_date"])),
@@ -57,21 +69,22 @@ def create_field(
     resolution_warning = validate_field_area(area, settings)
     sb = get_supabase_admin()
 
-    insert_data = {
-        "institution_id": institution_id,
-        "created_by": user_id,
-        "name": payload.name,
-        "boundary": geojson,
-        "area_hectares": round(area, 4),
-        "crop_type": payload.crop_type,
-        "sowing_date": payload.sowing_date.isoformat(),
-        "farmer_ref_id": payload.farmer_ref_id,
-        "loan_ref_id": payload.loan_ref_id,
-        "resolution_warning": resolution_warning,
-        "pilot_district": settings.pilot_district,
-    }
-
-    resp = sb.table("fields").insert(insert_data).execute()
+    resp = sb.rpc(
+        "create_field_from_geojson",
+        {
+            "p_institution_id": institution_id,
+            "p_created_by": user_id,
+            "p_name": payload.name,
+            "p_boundary": geojson,
+            "p_area_hectares": round(area, 4),
+            "p_crop_type": payload.crop_type,
+            "p_sowing_date": payload.sowing_date.isoformat(),
+            "p_farmer_ref_id": payload.farmer_ref_id,
+            "p_loan_ref_id": payload.loan_ref_id,
+            "p_resolution_warning": resolution_warning,
+            "p_pilot_district": settings.pilot_district,
+        },
+    ).execute()
     row = resp.data[0]
     process_field(row["id"], settings)
     return get_field(row["id"], institution_id)
@@ -92,7 +105,7 @@ def get_field(field_id: str, institution_id: str) -> FieldResponse:
         .execute()
     )
     risk_tier = risk_resp.data[0]["risk_tier"] if risk_resp.data else None
-    return _field_response(resp.data, risk_tier)
+    return _field_response(sb, resp.data[0], risk_tier)
 
 
 def list_fields(institution_id: str, status_filter: str | None = "active") -> list[FieldResponse]:
@@ -114,7 +127,7 @@ def list_fields(institution_id: str, status_filter: str | None = "active") -> li
         )
         risk_map = {r["field_id"]: r["risk_tier"] for r in risk_resp.data}
 
-    return [_field_response(r, risk_map.get(r["id"])) for r in resp.data]
+    return [_field_response(sb, r, risk_map.get(r["id"])) for r in resp.data]
 
 
 def update_field(
@@ -144,13 +157,23 @@ def update_field(
     if payload.boundary_geojson is not None:
         geojson = geojson_polygon(payload.boundary_geojson)
         area = compute_area_hectares(geojson)
-        updates["boundary"] = geojson
-        updates["area_hectares"] = round(area, 4)
-        updates["resolution_warning"] = validate_field_area(area, settings)
+        resolution_warning = validate_field_area(area, settings)
+        sb.rpc(
+            "update_field_boundary",
+            {
+                "p_field_id": field_id,
+                "p_boundary": geojson,
+                "p_area_hectares": round(area, 4),
+                "p_resolution_warning": resolution_warning,
+            },
+        ).execute()
+        updates["_boundary_changed"] = True
 
     if updates:
-        sb.table("fields").update(updates).eq("id", field_id).execute()
-        if any(k in updates for k in ("boundary", "sowing_date", "crop_type")):
+        table_updates = {k: v for k, v in updates.items() if not k.startswith("_")}
+        if table_updates:
+            sb.table("fields").update(table_updates).eq("id", field_id).execute()
+        if updates.get("_boundary_changed") or any(k in updates for k in ("sowing_date", "crop_type")):
             process_field(field_id, settings)
 
     return get_field(field_id, institution_id)
@@ -191,7 +214,7 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
 
     risk_tier = assessment[0]["risk_tier"] if assessment else None
     return {
-        "field": _field_response(field_resp.data, risk_tier),
+        "field": _field_response(sb, field_resp.data, risk_tier),
         "vegetation_readings": readings,
         "baseline": baseline,
         "current_assessment": assessment[0] if assessment else None,
@@ -202,7 +225,7 @@ def process_field(field_id: str, settings: Settings) -> None:
     sb = get_supabase_admin()
     field = sb.table("fields").select("*").eq("id", field_id).single().execute().data
     sowing = date.fromisoformat(str(field["sowing_date"]))
-    boundary = _boundary_from_row(field)
+    boundary = _boundary_from_row(sb, field)
     wkt = geojson_to_wkt(boundary)
 
     fused = select_and_fuse(wkt, sowing)

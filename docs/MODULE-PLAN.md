@@ -20,7 +20,7 @@
 | M8 | **Risk scoring** — z-score, rainfall cross-check, audit | FR-5.1–5.4 | `feat/m8-risk-scoring` | Core done |
 | M9 | **Dashboard UI** — map, charts, flags, list views | FR-6.x, NFR-1, NFR-8 | `feat/m9-dashboard-ui` | Functional · redesign pending |
 | M10 | **Reporting** — PDF field report, CSV portfolio | FR-7.x | `feat/m10-reporting` | Basic export done |
-| M11 | **Supabase production setup** — migrations, secrets, RLS test | NFR-4 | `chore/m11-supabase-setup` | Not started |
+| M11 | **Supabase production setup** — migrations, secrets, RLS test | NFR-4 | `chore/m11-supabase-setup` | In progress |
 | M12 | **ML layer (post-MVP)** — gradient-boosted model | FR-5.5 | `feat/m12-ml-risk` | Planned |
 
 ---
@@ -45,8 +45,11 @@ Tier 3 (M3) before Tier 2/1 — matches SRS design rule FR-3.7.
 ## Per-module acceptance criteria
 
 ### M11 — Supabase setup
-- [ ] Migration applied on hosted project
-- [ ] PostGIS enabled
+- [x] Migration SQL + geometry RPC helpers (`002_geometry_helpers.sql`)
+- [x] Setup guide (`docs/SUPABASE-SETUP.md`)
+- [x] Verify script (`scripts/verify_supabase.py`) + `/health/supabase` endpoint
+- [ ] Migration applied on hosted project (you run this)
+- [ ] PostGIS enabled on hosted project
 - [ ] Institution register → login → profile loads
 - [ ] RLS verified: institution A cannot read institution B fields
 

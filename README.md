@@ -73,6 +73,7 @@ With the backend running: http://localhost:8000/docs
 ## Documentation
 
 - [Module plan](docs/MODULE-PLAN.md) — delivery order and acceptance criteria
+- [Supabase setup](docs/SUPABASE-SETUP.md) — **start here after clone (M11)**
 - [Git workflow](docs/GIT-WORKFLOW.md) — branch and commit conventions
 - [UI/UX inspiration](docs/UI-UX-INSPIRATION.md) — design directions (pick before M9 redesign)
 - [SRS traceability](docs/SRS-traceability.md) — requirement → code map
