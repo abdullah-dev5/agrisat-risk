@@ -14,8 +14,15 @@ const WHEAT = '#B8954A';
 const FOREST_MUTED = 'rgba(61, 107, 90, 0.15)';
 
 export function VegetationChart({ readings, baseline }: Props) {
+  const nearestBaseline = (day: number) => {
+    if (!baseline.length) return undefined;
+    return baseline.reduce((best, b) =>
+      Math.abs(b.days_since_sowing - day) < Math.abs(best.days_since_sowing - day) ? b : best,
+    );
+  };
+
   const chartData = readings.map((r) => {
-    const b = baseline.find((x) => x.days_since_sowing === r.days_since_sowing);
+    const b = nearestBaseline(r.days_since_sowing);
     const value = r.ndvi ?? r.sar_index ?? 0;
     return {
       day: r.days_since_sowing,

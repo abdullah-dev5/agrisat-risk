@@ -32,7 +32,7 @@ export function DashboardPage() {
           <span className="eyebrow">Portfolio overview</span>
           <h1>{PILOT_CROP} · {PILOT_DISTRICT}</h1>
           <p className="page-intro">
-            Satellite-derived crop risk for your registered portfolio. Decision-support only — not automated loan or claims decisions.
+            Satellite-derived crop risk for your registered portfolio. Use the map layers icon for Satellite (sharp) vs Sentinel-2 (crop context). Decision-support only.
           </p>
         </div>
       </div>

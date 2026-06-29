@@ -3,9 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { parseBoundaryFile } from '../lib/boundaryParser';
 import { FieldsMap } from '../components/FieldsMap';
-import { PILOT_CROP, PILOT_DISTRICT_KEY } from '../lib/constants';
+import { SubmitOverlay } from '../components/ui/SubmitOverlay';
+import { PILOT_CROP, PILOT_DISTRICT, PILOT_DISTRICT_KEY } from '../lib/constants';
 
 type InputMode = 'draw' | 'upload';
+
+const REGISTRATION_STEPS = [
+  { id: 1, label: 'Define boundary', hint: 'Draw on map or upload a file' },
+  { id: 2, label: 'Field details', hint: 'Name, sowing date, references' },
+  { id: 3, label: 'Analyze', hint: 'GEE vegetation + risk score' },
+] as const;
 
 export function RegisterFieldPage() {
   const navigate = useNavigate();
@@ -19,6 +26,9 @@ export function RegisterFieldPage() {
   const [sowingDate, setSowingDate] = useState('2025-11-15');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLayerHelp, setShowLayerHelp] = useState(false);
+
+  const currentStep = !polygon ? 1 : loading ? 3 : 2;
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -62,15 +72,43 @@ export function RegisterFieldPage() {
 
   return (
     <>
+      {loading && (
+        <SubmitOverlay
+          title="Registering field…"
+          message="Saving your boundary and running satellite vegetation analysis. This usually takes 30–90 seconds."
+          steps={[
+            'Saving field boundary to database',
+            'Fetching Sentinel-2 NDVI and Sentinel-1 SAR (Google Earth Engine)',
+            'Computing baseline comparison and risk tier',
+          ]}
+        />
+      )}
+
       <div className="page-header">
         <div>
-          <span className="eyebrow">Field registration</span>
+          <span className="eyebrow">Field registration · {PILOT_DISTRICT}</span>
           <h1>Register a new field</h1>
           <p className="page-intro">
-            Draw on the map or upload a boundary file (GeoJSON, KML, or coordinate list). Pilot crop: {PILOT_CROP}.
+            Step {currentStep} of 3 — draw a boundary on <strong>Satellite</strong> imagery (sharp), then complete the form.
+            Sentinel-2 layer is for crop context only (~10 m, slower to load).
           </p>
         </div>
       </div>
+
+      <ol className="register-steps" aria-label="Registration progress">
+        {REGISTRATION_STEPS.map((step) => (
+          <li
+            key={step.id}
+            className={`register-step${currentStep === step.id ? ' register-step--active' : ''}${currentStep > step.id ? ' register-step--done' : ''}`}
+          >
+            <span className="register-step-num">{currentStep > step.id ? '✓' : step.id}</span>
+            <span className="register-step-text">
+              <strong>{step.label}</strong>
+              <span>{step.hint}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
 
       <div className="register-layout">
         <div className="panel">
@@ -78,25 +116,54 @@ export function RegisterFieldPage() {
             <button
               type="button"
               className={inputMode === 'draw' ? 'tab active' : 'tab'}
-              onClick={() => { setInputMode('draw'); setPolygon(null); setUploadName(''); }}
+              onClick={() => setInputMode('draw')}
             >
               Draw on map
             </button>
             <button
               type="button"
               className={inputMode === 'upload' ? 'tab active' : 'tab'}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setInputMode('upload')}
             >
               Upload file
             </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".geojson,.json,.kml,.txt,.csv"
-              hidden
-              onChange={handleFileChange}
-            />
           </div>
+
+          {inputMode === 'upload' && (
+            <div className="upload-file-row">
+              <button type="button" className="btn secondary" onClick={() => fileRef.current?.click()}>
+                Choose boundary file
+              </button>
+              <span className="upload-file-hint">
+                {uploadName || '.geojson · .kml · coordinate list (.txt/.csv)'}
+              </span>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".geojson,.json,.kml,.txt,.csv"
+                hidden
+                onChange={handleFileChange}
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="map-layer-help-toggle"
+            onClick={() => setShowLayerHelp((v) => !v)}
+            aria-expanded={showLayerHelp}
+          >
+            {showLayerHelp ? 'Hide map layer guide' : 'Which map layer should I use?'}
+          </button>
+
+          {showLayerHelp && (
+            <div className="map-layer-help">
+              <p><strong>Satellite (Esri)</strong> — Use for drawing field boundaries. Sharp at Z15–17.</p>
+              <p><strong>Sentinel-2 (EOX)</strong> — Crop monitoring context (~10 m). Slow to load; blur above Z15 is normal (not still loading).</p>
+              <p><strong>Hybrid</strong> — Satellite plus place names. <strong>Street</strong> — District overview only.</p>
+              <p className="map-layer-help-note">Switch layers with the stack icon (top-right of map). Watch the status banner at the bottom of the map.</p>
+            </div>
+          )}
 
           {inputMode === 'draw' ? (
             <FieldsMap
@@ -138,40 +205,43 @@ export function RegisterFieldPage() {
 
           <div className={`map-draw-hint ${polygon ? 'success' : ''}`}>
             {polygon
-              ? `✓ Boundary ready${uploadName ? ` — ${uploadName}` : ''}`
+              ? `✓ Boundary ready${uploadName ? ` — ${uploadName}` : ''} — complete the form on the right`
               : inputMode === 'draw'
-                ? 'Use the pencil tool, place at least 3 points, then click Finish'
-                : 'Upload .geojson, .kml, or .txt coordinate list (lng, lat per line)'}
+                ? 'Pencil → place ≥3 points → Finish. Use Satellite layer; zoom to Z16–17 for accuracy.'
+                : 'Choose a file above, or switch to Draw on map'}
           </div>
         </div>
 
-        <form className="card-elevated" onSubmit={handleSubmit} style={{ padding: '2rem' }}>
-          <span className="section-title">Field metadata</span>
+        <form className="card-elevated register-form" onSubmit={handleSubmit}>
+          <span className="section-title">Step 2 · Field metadata</span>
+          <p className="register-form-intro">
+            After you register, AgriSat pulls live Sentinel-2 / Sentinel-1 data via Google Earth Engine and assigns a risk tier.
+          </p>
 
           <div className="form-group">
-            <label>Field name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional display name" />
+            <label htmlFor="field-name">Field name</label>
+            <input id="field-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional display name" />
           </div>
           <div className="form-group">
-            <label>Farmer reference</label>
-            <input value={farmerRef} onChange={(e) => setFarmerRef(e.target.value)} placeholder="Your internal ID" />
+            <label htmlFor="farmer-ref">Farmer reference</label>
+            <input id="farmer-ref" value={farmerRef} onChange={(e) => setFarmerRef(e.target.value)} placeholder="Your internal ID" />
           </div>
           <div className="form-group">
-            <label>Loan / policy reference</label>
-            <input value={loanRef} onChange={(e) => setLoanRef(e.target.value)} placeholder="Optional" />
+            <label htmlFor="loan-ref">Loan / policy reference</label>
+            <input id="loan-ref" value={loanRef} onChange={(e) => setLoanRef(e.target.value)} placeholder="Optional" />
           </div>
           <div className="form-group">
-            <label>Sowing date</label>
-            <input type="date" value={sowingDate} onChange={(e) => setSowingDate(e.target.value)} required />
+            <label htmlFor="sowing-date">Sowing date</label>
+            <input id="sowing-date" type="date" value={sowingDate} onChange={(e) => setSowingDate(e.target.value)} required />
           </div>
 
-          <p className="disclaimer" style={{ marginBottom: '1.25rem' }}>
+          <p className="disclaimer">
             Risk scores are decision-support information only — not automated loan or claims decisions.
           </p>
 
           {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={loading || !polygon} style={{ width: '100%' }}>
-            {loading ? 'Analyzing vegetation…' : 'Register & analyze'}
+          <button type="submit" disabled={loading || !polygon} className="register-submit">
+            {loading ? 'Analyzing…' : polygon ? 'Register & analyze' : 'Draw or upload a boundary first'}
           </button>
         </form>
       </div>

@@ -1,5 +1,6 @@
 """Field CRUD and processing orchestration."""
 
+import logging
 from datetime import date
 from typing import Any
 
@@ -7,11 +8,67 @@ from fastapi import HTTPException, status
 
 from app.core.config import Settings
 from app.core.supabase_client import get_supabase_admin
+from app.models.enums import DataTier
 from app.schemas.domain import FieldCreateRequest, FieldResponse, FieldUpdateRequest
-from app.services.baseline import generate_demo_baseline
-from app.services.fusion import FusedReading, select_and_fuse
+from app.services.baseline import build_gee_baseline
+from app.services.fusion import FusedReading, FusionResult, select_and_fuse
 from app.services.geometry import compute_area_hectares, geojson_polygon, geojson_to_wkt, validate_field_area
 from app.services.risk_engine import assess_risk
+from app.services.vegetation_index import index_family_for_tier
+
+logger = logging.getLogger(__name__)
+
+
+def _load_baselines(sb, crop_type: str, pilot_district: str) -> list[dict]:
+    resp = (
+        sb.table("baseline_stats")
+        .select("*")
+        .eq("crop_type", crop_type)
+        .eq("pilot_district", pilot_district)
+        .execute()
+    )
+    return resp.data or []
+
+
+def _ensure_gee_baselines(
+    sb,
+    wkt: str,
+    sowing: date,
+    crop_type: str,
+    pilot_district: str,
+) -> list[dict]:
+    """Build and persist live GEE baselines for crop + district."""
+    from app.services.tiers.gee_client import is_gee_configured
+
+    if not is_gee_configured():
+        return _load_baselines(sb, crop_type, pilot_district)
+
+    try:
+        rows = build_gee_baseline(wkt, sowing)
+    except Exception as exc:
+        logger.warning("GEE baseline build failed: %s", exc)
+        return _load_baselines(sb, crop_type, pilot_district)
+
+    if not rows:
+        return _load_baselines(sb, crop_type, pilot_district)
+
+    # Replace stale demo / mismatched baselines for this crop + district
+    sb.table("baseline_stats").delete().eq("crop_type", crop_type).eq(
+        "pilot_district", pilot_district
+    ).execute()
+
+    for b in rows:
+        payload = {"crop_type": crop_type, "pilot_district": pilot_district, **b}
+        try:
+            sb.table("baseline_stats").insert(payload).execute()
+        except Exception as exc:
+            # Pre-migration 005: one row per growth stage — keep first tier inserted (SAR listed first)
+            if "23505" in str(exc):
+                logger.debug("Baseline day %s tier skipped (schema upgrade 005 pending)", b.get("days_since_sowing"))
+                continue
+            raise
+
+    return _load_baselines(sb, crop_type, pilot_district)
 
 
 def _first_row(data: Any) -> dict[str, Any] | None:
@@ -73,6 +130,17 @@ def create_field(
 
     if area > settings.max_field_hectares:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Field area exceeds maximum threshold")
+
+    from app.services.tiers.gee_client import is_gee_configured
+
+    if not is_gee_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Satellite analysis requires Google Earth Engine. "
+                "Configure GEE_SERVICE_ACCOUNT_EMAIL and GEE_PRIVATE_KEY_PATH in backend/.env"
+            ),
+        )
 
     resolution_warning = validate_field_area(area, settings)
     sb = get_supabase_admin()
@@ -224,8 +292,16 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
         .execute()
         .data
     )
-
     assessment_row = _first_row(assessment)
+    if assessment_row and assessment_row.get("primary_data_tier") and baseline:
+        tier = DataTier(assessment_row["primary_data_tier"])
+        family = index_family_for_tier(tier.value)
+        matched = [
+            b for b in baseline
+            if index_family_for_tier(str(b.get("primary_tier", "tier3_sar"))) == family
+        ]
+        if matched:
+            baseline = matched
     risk_tier = assessment_row["risk_tier"] if assessment_row else None
 
     audit_resp = (
@@ -257,7 +333,23 @@ def process_field(field_id: str, settings: Settings) -> None:
     boundary = _boundary_from_row(sb, field)
     wkt = geojson_to_wkt(boundary)
 
-    fused_result = select_and_fuse(wkt, sowing)
+    from app.services.tiers.gee_client import GEEError
+
+    try:
+        fused_result = select_and_fuse(wkt, sowing)
+    except GEEError as exc:
+        logger.error("Vegetation fusion failed for field %s: %s", field_id, exc)
+        fused_result = FusionResult(
+            readings=[],
+            pipeline={
+                "tier1": "empty",
+                "tier2": "empty",
+                "tier3": "gee_error",
+                "vegetation_source": "gee_error",
+                "reading_count": "0",
+            },
+        )
+
     fused = fused_result.readings
     pipeline_meta = fused_result.pipeline
 
@@ -275,23 +367,9 @@ def process_field(field_id: str, settings: Settings) -> None:
             "is_fused": True,
         }).execute()
 
-    baseline_rows = (
-        sb.table("baseline_stats")
-        .select("*")
-        .eq("crop_type", field["crop_type"])
-        .eq("pilot_district", field["pilot_district"])
-        .execute()
-        .data
+    baseline_rows = _ensure_gee_baselines(
+        sb, wkt, sowing, field["crop_type"], field["pilot_district"]
     )
-    if not baseline_rows:
-        demo = generate_demo_baseline(settings)
-        for b in demo:
-            sb.table("baseline_stats").upsert({
-                "crop_type": field["crop_type"],
-                "pilot_district": field["pilot_district"],
-                **b,
-            }).execute()
-        baseline_rows = demo
 
     rainfall_mm = None
     rainfall_anomaly_pct = None
@@ -308,10 +386,6 @@ def process_field(field_id: str, settings: Settings) -> None:
             rainfall_source = "gee_chirps"
         except Exception:
             rainfall_source = "gee_error"
-    elif settings.gee_allow_demo_fallback:
-        rainfall_anomaly_pct = -25.0
-        rainfall_mm = 12.0
-        rainfall_source = "demo_fallback"
 
     fused_objs = [
         FusedReading(

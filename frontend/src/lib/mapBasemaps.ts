@@ -24,7 +24,8 @@ export const BASEMAPS: BasemapConfig[] = [
     attribution:
       'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, USDA FSA, USGS, AeroGRID, IGN, IGP',
     maxZoom: 20,
-    maxNativeZoom: 19,
+    /** Rural Sindh often has no native tiles above ~17; Leaflet upscales above this */
+    maxNativeZoom: 17,
     recommendedForDraw: true,
   },
   {
@@ -34,7 +35,7 @@ export const BASEMAPS: BasemapConfig[] = [
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Imagery &copy; Esri · Labels &copy; Esri, OpenStreetMap',
     maxZoom: 20,
-    maxNativeZoom: 19,
+    maxNativeZoom: 17,
   },
   {
     id: 'sentinel',

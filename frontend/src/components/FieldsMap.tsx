@@ -7,6 +7,7 @@ import { DEFAULT_BASEMAP_DRAW, type BasemapId } from '../lib/mapBasemaps';
 import { MapBasemapLayers } from './map/MapBasemapLayers';
 import { MapFitBounds } from './map/MapFitBounds';
 import { MapInspector } from './map/MapInspector';
+import { MapStatusOverlay } from './map/MapStatusOverlay';
 
 export const DRAW_COLORS = [
   { id: 'forest', hex: '#1B3D36', label: 'Forest' },
@@ -269,14 +270,6 @@ export function FieldsMap({
         />
       )}
 
-      {drawMode && (
-        <div className="map-draw-status">
-          {finished && committedPolygon
-            ? 'Boundary closed — zoom in on satellite for accuracy, then register'
-            : `${vertices.length} point${vertices.length !== 1 ? 's' : ''} · switch to Satellite layer · zoom 16+ for parcels`}
-        </div>
-      )}
-
       <MapContainer
         center={PILOT_MAP_CENTER}
         zoom={initialZoom}
@@ -287,8 +280,14 @@ export function FieldsMap({
       >
         <ZoomControl position="bottomright" />
         <MapBasemapLayers defaultBasemap={defaultBasemap} />
+        <MapStatusOverlay
+          defaultBasemap={defaultBasemap}
+          drawMode={drawMode}
+          vertexCount={vertices.length}
+          finished={finished && !!committedPolygon}
+        />
         {(showInspector || drawMode) && (
-          <MapInspector dataLabel={dataFreshnessLabel} />
+          <MapInspector dataLabel={dataFreshnessLabel} defaultBasemap={defaultBasemap} />
         )}
         {fitToFields && fitPolygons.length > 0 && (
           <MapFitBounds polygons={fitPolygons} maxZoom={drawMode ? 18 : 17} />

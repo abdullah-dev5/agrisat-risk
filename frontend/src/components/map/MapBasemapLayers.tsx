@@ -11,22 +11,22 @@ export function MapBasemapLayers({ defaultBasemap = 'satellite' }: MapBasemapLay
       {BASEMAPS.map((basemap) => (
         <LayersControl.BaseLayer
           key={basemap.id}
-          name={basemap.label}
+          name={`${basemap.label} — ${basemap.recommendedForDraw ? 'best for drawing' : basemap.id === 'sentinel' ? 'crop context ~10 m' : 'overview'}`}
           checked={basemap.id === defaultBasemap}
         >
           <TileLayer
             url={basemap.url}
             attribution={basemap.attribution}
             maxZoom={basemap.maxZoom}
-            maxNativeZoom={basemap.maxNativeZoom}
-            subdomains={basemap.subdomains}
+            {...(basemap.maxNativeZoom != null ? { maxNativeZoom: basemap.maxNativeZoom } : {})}
+            {...(basemap.subdomains ? { subdomains: basemap.subdomains } : {})}
           />
           {basemap.id === 'hybrid' && (
             <TileLayer
               url={HYBRID_LABELS_URL}
               attribution=""
               maxZoom={20}
-              maxNativeZoom={19}
+              maxNativeZoom={17}
               pane="overlayPane"
             />
           )}
