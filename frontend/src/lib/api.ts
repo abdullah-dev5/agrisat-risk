@@ -31,6 +31,8 @@ export const api = {
   getFieldDetail: (id: string) => apiFetch<import('../types').FieldDetail>(`/api/v1/fields/${id}/detail`),
   createField: (body: unknown) =>
     apiFetch<import('../types').Field>('/api/v1/fields', { method: 'POST', body: JSON.stringify(body) }),
+  reprocessField: (id: string) =>
+    apiFetch<{ message: string }>(`/api/v1/fields/${id}/reprocess`, { method: 'POST' }),
   portfolioSummary: () => apiFetch<import('../types').PortfolioSummary>('/api/v1/reports/portfolio/summary'),
   registerInstitution: (body: unknown) =>
     apiFetch<{ id: string; name: string }>('/api/v1/auth/register-institution', {

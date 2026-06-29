@@ -7,9 +7,11 @@ from datetime import date, timedelta
 from functools import lru_cache
 
 from shapely import wkt as parse_wkt
+from pathlib import Path
 
 from app.core.config import get_settings
 from app.services.tiers.base import RainfallContext, TierReading
+from app.services.vegetation_index import sar_index_from_vv_db
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,11 @@ class GEEError(RuntimeError):
 
 def is_gee_configured() -> bool:
     settings = get_settings()
-    return bool(settings.gee_service_account_email and settings.gee_private_key_path)
+    return bool(
+        settings.gee_service_account_email
+        and settings.resolved_gee_key_path
+        and Path(settings.resolved_gee_key_path).is_file()
+    )
 
 
 def _wkt_to_ee_geometry(boundary_wkt: str):
@@ -47,7 +53,7 @@ def _ensure_gee_initialized() -> None:
 
     credentials = ee.ServiceAccountCredentials(
         settings.gee_service_account_email,
-        settings.gee_private_key_path,
+        settings.resolved_gee_key_path,
     )
     init_kwargs: dict = {"credentials": credentials}
     if settings.gee_project:
@@ -59,7 +65,7 @@ def _ensure_gee_initialized() -> None:
 
 def _sar_index_from_vv_db(vv_db: float) -> float:
     """Map Sentinel-1 VV backscatter (dB) to ~0–1 index for risk engine parity."""
-    return round(max(0.0, min(1.0, (vv_db + 22.0) / 18.0)), 5)
+    return sar_index_from_vv_db(vv_db)
 
 
 def _end_date_exclusive(end: date) -> str:
