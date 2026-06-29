@@ -1,8 +1,12 @@
-import { CircleMarker, GeoJSON, MapContainer, Polygon, Polyline, TileLayer, useMapEvents, ZoomControl } from 'react-leaflet';
+import { CircleMarker, GeoJSON, MapContainer, Polygon, Polyline, useMapEvents, ZoomControl } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Field, RiskTier } from '../types';
-import { MAP_ATTRIBUTION, MAP_TILE_URL, PILOT_MAP_CENTER, RISK_COLORS } from '../lib/constants';
+import { PILOT_MAP_CENTER, RISK_COLORS } from '../lib/constants';
+import { DEFAULT_BASEMAP_DRAW, type BasemapId } from '../lib/mapBasemaps';
+import { MapBasemapLayers } from './map/MapBasemapLayers';
+import { MapFitBounds } from './map/MapFitBounds';
+import { MapInspector } from './map/MapInspector';
 
 export const DRAW_COLORS = [
   { id: 'forest', hex: '#1B3D36', label: 'Forest' },
@@ -22,6 +26,12 @@ interface FieldsMapProps {
   committedPolygon?: GeoJSON.Polygon | null;
   className?: string;
   minHeight?: number;
+  defaultBasemap?: BasemapId;
+  initialZoom?: number;
+  showInspector?: boolean;
+  fitToFields?: boolean;
+  /** e.g. "Latest NDVI · 2025-12-14" */
+  dataFreshnessLabel?: string;
 }
 
 function verticesToPolygon(vertices: LatLngTuple[]): GeoJSON.Polygon {
@@ -180,11 +190,22 @@ export function FieldsMap({
   committedPolygon,
   className = 'map-container',
   minHeight = 420,
+  defaultBasemap = DEFAULT_BASEMAP_DRAW,
+  initialZoom = 13,
+  showInspector = false,
+  fitToFields = false,
+  dataFreshnessLabel,
 }: FieldsMapProps) {
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0].hex);
   const [drawTool, setDrawTool] = useState<DrawTool>('pencil');
   const [vertices, setVertices] = useState<LatLngTuple[]>([]);
   const [finished, setFinished] = useState(false);
+
+  const fitPolygons = useMemo(() => {
+    const polys = fields.map((f) => f.boundary_geojson).filter(Boolean);
+    if (committedPolygon) polys.push(committedPolygon);
+    return polys;
+  }, [fields, committedPolygon]);
 
   useEffect(() => {
     if (!drawMode) {
@@ -231,7 +252,7 @@ export function FieldsMap({
 
   return (
     <div
-      className={`${className}${drawMode ? ' map-container--draw' : ''}`}
+      className={`${className}${drawMode ? ' map-container--draw' : ''} map-container--layers`}
       style={{ minHeight, position: 'relative' }}
       data-draw-tool={drawMode ? drawTool : undefined}
     >
@@ -251,14 +272,27 @@ export function FieldsMap({
       {drawMode && (
         <div className="map-draw-status">
           {finished && committedPolygon
-            ? 'Boundary closed — click Clear to redraw'
-            : `${vertices.length} point${vertices.length !== 1 ? 's' : ''} · ${drawTool === 'pencil' ? 'click to add' : 'click to erase'} · right-click undo`}
+            ? 'Boundary closed — zoom in on satellite for accuracy, then register'
+            : `${vertices.length} point${vertices.length !== 1 ? 's' : ''} · switch to Satellite layer · zoom 16+ for parcels`}
         </div>
       )}
 
-      <MapContainer center={PILOT_MAP_CENTER} zoom={11} style={{ height: '100%', width: '100%', minHeight }} zoomControl={false}>
+      <MapContainer
+        center={PILOT_MAP_CENTER}
+        zoom={initialZoom}
+        minZoom={5}
+        maxZoom={20}
+        style={{ height: '100%', width: '100%', minHeight }}
+        zoomControl={false}
+      >
         <ZoomControl position="bottomright" />
-        <TileLayer attribution={MAP_ATTRIBUTION} url={MAP_TILE_URL} />
+        <MapBasemapLayers defaultBasemap={defaultBasemap} />
+        {(showInspector || drawMode) && (
+          <MapInspector dataLabel={dataFreshnessLabel} />
+        )}
+        {fitToFields && fitPolygons.length > 0 && (
+          <MapFitBounds polygons={fitPolygons} maxZoom={drawMode ? 18 : 17} />
+        )}
 
         {drawMode && !finished && (
           <PolygonDrawLayer

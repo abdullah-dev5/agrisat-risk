@@ -105,6 +105,10 @@ export function RegisterFieldPage() {
               committedPolygon={polygon}
               onPolygonComplete={setPolygon}
               minHeight={420}
+              defaultBasemap="satellite"
+              initialZoom={15}
+              showInspector
+              fitToFields={!!polygon}
             />
           ) : (
             <FieldsMap
@@ -125,6 +129,10 @@ export function RegisterFieldPage() {
                 created_at: '',
               }] : []}
               minHeight={420}
+              defaultBasemap="satellite"
+              initialZoom={16}
+              fitToFields={!!polygon}
+              showInspector
             />
           )}
 

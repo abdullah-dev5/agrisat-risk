@@ -56,6 +56,9 @@ def main() -> int:
             print(f"[OK] Backend /health — {r.json()}")
             r2 = httpx.get(f"{api}/health/supabase", timeout=10)
             print(f"[OK] Backend /health/supabase — {r2.json()}")
+            r3 = httpx.get(f"{api}/health/gee", timeout=30)
+            gee = r3.json()
+            print(f"[OK] Backend /health/gee — {gee.get('connection')} ({gee.get('message', '')[:60]})")
         else:
             print(f"[SKIP] Backend not running at {api} (start uvicorn to test)")
     except Exception:

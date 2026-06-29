@@ -40,6 +40,7 @@ async def get_field_detail(field_id: str, user: AuthUser = Depends(get_current_u
         vegetation_readings=detail["vegetation_readings"],
         baseline=detail["baseline"],
         current_assessment=assessment,
+        pipeline=detail.get("pipeline"),
     )
 
 

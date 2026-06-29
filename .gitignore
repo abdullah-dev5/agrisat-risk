@@ -33,6 +33,7 @@ Thumbs.db
 
 # Earth Engine credentials (never commit)
 *-gee-key.json
+gee-service-account.json
 service-account*.json
 
 # Reports temp
