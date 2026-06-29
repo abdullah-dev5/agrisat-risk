@@ -6,6 +6,8 @@ import { FieldsListPage } from './pages/FieldsListPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterFieldPage } from './pages/RegisterFieldPage';
 import { RegisterInstitutionPage } from './pages/RegisterInstitutionPage';
+import { TeamPage } from './pages/TeamPage';
+import { GuidePage } from './pages/GuidePage';
 
 export function App() {
   return (
@@ -18,6 +20,8 @@ export function App() {
           <Route path="/fields" element={<FieldsListPage />} />
           <Route path="/fields/new" element={<RegisterFieldPage />} />
           <Route path="/fields/:id" element={<FieldDetailPage />} />
+          <Route path="/team" element={<TeamPage />} />
+          <Route path="/guide" element={<GuidePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

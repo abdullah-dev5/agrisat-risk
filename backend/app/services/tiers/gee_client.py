@@ -35,8 +35,6 @@ def _wkt_to_ee_geometry(boundary_wkt: str):
     import ee
 
     geom = parse_wkt.loads(boundary_wkt)
-    if geom.geom_type != "Polygon":
-        raise ValueError("Field boundary must be a Polygon for GEE extraction")
     return ee.Geometry(geom.__geo_interface__)
 
 
@@ -218,6 +216,76 @@ def fetch_tier3_from_gee(
             "No Sentinel-1 or Sentinel-2 scenes found for this field and date range. "
             "Try a later sowing date or verify the AOI is within Matiari coverage."
         )
+    return readings
+
+
+def fetch_tier2_composite_from_gee(
+    boundary_wkt: str,
+    sowing_date: date,
+    season_end: date | None = None,
+) -> list[TierReading]:
+    """Tier 2 — weekly cloud-masked Sentinel-2 median composites (M4 GEE path)."""
+    import ee
+
+    _ensure_gee_initialized()
+    end = season_end or date.today()
+    region = _wkt_to_ee_geometry(boundary_wkt)
+    readings: list[TierReading] = []
+    week_start = sowing_date
+
+    def mask_s2(img: ee.Image) -> ee.Image:
+        scl = img.select("SCL")
+        clear = (
+            scl.neq(3)
+            .And(scl.neq(8))
+            .And(scl.neq(9))
+            .And(scl.neq(10))
+        )
+        return img.updateMask(clear)
+
+    while week_start <= end:
+        week_end = min(week_start + timedelta(days=6), end)
+        end_exclusive = _end_date_exclusive(week_end)
+        coll = (
+            ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+            .filterBounds(region)
+            .filterDate(week_start.isoformat(), end_exclusive)
+            .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 25))
+            .map(mask_s2)
+        )
+        count = coll.size().getInfo()
+        if count == 0:
+            week_start += timedelta(days=7)
+            continue
+
+        composite = coll.median()
+        ndvi = composite.normalizedDifference(["B8", "B4"]).rename("NDVI")
+        evi = composite.expression(
+            "2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))",
+            {"NIR": composite.select("B8"), "RED": composite.select("B4"), "BLUE": composite.select("B2")},
+        ).rename("EVI")
+        stats = ndvi.addBands(evi).reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=region,
+            scale=10,
+            maxPixels=1e9,
+            bestEffort=True,
+        ).getInfo()
+
+        ndvi_val = stats.get("NDVI")
+        if ndvi_val is not None:
+            readings.append(
+                TierReading(
+                    acquisition_date=week_end,
+                    ndvi=round(float(ndvi_val), 5),
+                    evi=round(float(stats.get("EVI", ndvi_val)), 5),
+                    cloud_fraction=0.0,
+                )
+            )
+        week_start += timedelta(days=7)
+
+    if not readings:
+        raise GEEError("No clear Sentinel-2 composites found for Tier 2 in this date range.")
     return readings
 
 

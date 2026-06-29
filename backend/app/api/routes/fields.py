@@ -1,15 +1,25 @@
+import logging
+
 from fastapi import APIRouter, Depends, Query
 
 from app.core.auth import AuthUser, get_current_user
 from app.core.config import Settings, get_settings
-from app.schemas.domain import FieldCreateRequest, FieldDetailResponse, FieldResponse, FieldUpdateRequest
+from app.schemas.domain import (
+    FieldCreateRequest,
+    FieldDetailResponse,
+    FieldImageryResponse,
+    FieldResponse,
+    FieldUpdateRequest,
+    RiskAssessmentResponse,
+)
 from app.services import field_service
 
 router = APIRouter(prefix="/fields", tags=["fields"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[FieldResponse])
-async def list_fields(
+def list_fields(
     status: str | None = Query(default="active"),
     user: AuthUser = Depends(get_current_user),
 ):
@@ -17,7 +27,7 @@ async def list_fields(
 
 
 @router.post("", response_model=FieldResponse)
-async def create_field(
+def create_field(
     payload: FieldCreateRequest,
     user: AuthUser = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
@@ -26,15 +36,18 @@ async def create_field(
 
 
 @router.get("/{field_id}", response_model=FieldResponse)
-async def get_field(field_id: str, user: AuthUser = Depends(get_current_user)):
+def get_field(field_id: str, user: AuthUser = Depends(get_current_user)):
     return field_service.get_field(field_id, user.institution_id)
 
 
 @router.get("/{field_id}/detail", response_model=FieldDetailResponse)
-async def get_field_detail(field_id: str, user: AuthUser = Depends(get_current_user)):
+def get_field_detail(field_id: str, user: AuthUser = Depends(get_current_user)):
     detail = field_service.get_field_detail(field_id, user.institution_id)
     field = detail["field"]
-    assessment = detail.get("current_assessment")
+    assessment_raw = detail.get("current_assessment")
+    assessment = (
+        RiskAssessmentResponse.model_validate(assessment_raw) if assessment_raw else None
+    )
     return FieldDetailResponse(
         **field.model_dump(),
         vegetation_readings=detail["vegetation_readings"],
@@ -45,7 +58,7 @@ async def get_field_detail(field_id: str, user: AuthUser = Depends(get_current_u
 
 
 @router.patch("/{field_id}", response_model=FieldResponse)
-async def update_field(
+def update_field(
     field_id: str,
     payload: FieldUpdateRequest,
     user: AuthUser = Depends(get_current_user),
@@ -54,8 +67,13 @@ async def update_field(
     return field_service.update_field(field_id, payload, user.institution_id, settings)
 
 
+@router.get("/{field_id}/imagery", response_model=FieldImageryResponse)
+def get_field_imagery(field_id: str, user: AuthUser = Depends(get_current_user)):
+    return field_service.get_field_imagery(field_id, user.institution_id)
+
+
 @router.post("/{field_id}/reprocess")
-async def reprocess_field(
+def reprocess_field(
     field_id: str,
     user: AuthUser = Depends(get_current_user),
     settings: Settings = Depends(get_settings),

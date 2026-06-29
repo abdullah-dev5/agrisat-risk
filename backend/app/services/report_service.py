@@ -41,6 +41,23 @@ def generate_field_pdf(field_id: str, institution_id: str) -> bytes:
             f"Risk tier: {assessment['risk_tier'].upper()}",
             f"Z-score: {assessment.get('z_score', 'N/A')}",
             f"Data tier: {assessment.get('primary_data_tier', 'N/A')}",
+            f"Growth stage: day {assessment.get('days_since_sowing', 'N/A')}",
+            f"Index value: {assessment.get('index_value', 'N/A')}",
+        ])
+        if assessment.get("rainfall_mm") is not None:
+            lines.append(
+                f"Rainfall: {assessment['rainfall_mm']:.1f} mm "
+                f"({assessment.get('rainfall_anomaly_pct', 0):+.0f}% vs 5-yr avg)"
+            )
+        readings = detail.get("vegetation_readings") or []
+        if readings:
+            latest = readings[-1]
+            lines.extend([
+                "",
+                f"Latest scene: {latest.get('acquisition_date')} ({latest.get('data_tier', 'N/A')})",
+                f"Latest NDVI: {latest.get('ndvi', 'N/A')}",
+            ])
+        lines.extend([
             "",
             "Explanation:",
             assessment["explanation"],
@@ -95,3 +112,102 @@ def generate_portfolio_csv(institution_id: str) -> str:
         ])
 
     return output.getvalue()
+
+
+def generate_portfolio_pdf(institution_id: str) -> bytes:
+    sb = get_supabase_admin()
+    fields = (
+        sb.table("fields")
+        .select("*")
+        .eq("institution_id", institution_id)
+        .eq("status", "active")
+        .order("created_at")
+        .execute()
+        .data
+        or []
+    )
+
+    risk_counts: dict[str, int] = {
+        "normal": 0,
+        "watch": 0,
+        "elevated": 0,
+        "high": 0,
+        "insufficient_data": 0,
+    }
+    rows: list[tuple[str, str, str, str, str]] = []
+
+    for f in fields:
+        assessment = (
+            sb.table("risk_assessments")
+            .select("risk_tier, z_score, explanation")
+            .eq("field_id", f["id"])
+            .eq("is_current", True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        a = assessment[0] if assessment else {}
+        tier = a.get("risk_tier", "normal")
+        risk_counts[tier] = risk_counts.get(tier, 0) + 1
+        label = f.get("name") or f.get("farmer_ref_id") or f["id"][:8]
+        rows.append((
+            label[:28],
+            str(f.get("crop_type", "")),
+            str(f.get("sowing_date", "")),
+            f"{f.get('area_hectares', '—')} ha",
+            tier.upper(),
+        ))
+
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    y = height - 2 * cm
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(2 * cm, y, "AgriSat Risk — Portfolio Summary")
+    y -= 1.2 * cm
+
+    c.setFont("Helvetica", 11)
+    c.drawString(2 * cm, y, f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC")
+    y -= 0.7 * cm
+    c.drawString(2 * cm, y, f"Active fields: {len(fields)}")
+    y -= 1 * cm
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(2 * cm, y, "Risk distribution")
+    y -= 0.7 * cm
+    c.setFont("Helvetica", 10)
+    for tier, count in risk_counts.items():
+        if count:
+            c.drawString(2.2 * cm, y, f"{tier.replace('_', ' ').title()}: {count}")
+            y -= 0.5 * cm
+    y -= 0.4 * cm
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(2 * cm, y, "Field register")
+    y -= 0.6 * cm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(2 * cm, y, "Field")
+    c.drawString(7 * cm, y, "Crop")
+    c.drawString(9.5 * cm, y, "Sowing")
+    c.drawString(12.5 * cm, y, "Area")
+    c.drawString(15 * cm, y, "Risk")
+    y -= 0.45 * cm
+    c.setFont("Helvetica", 9)
+
+    for label, crop, sowing, area, tier in rows:
+        if y < 2.5 * cm:
+            c.showPage()
+            y = height - 2 * cm
+            c.setFont("Helvetica", 9)
+        c.drawString(2 * cm, y, label)
+        c.drawString(7 * cm, y, crop[:10])
+        c.drawString(9.5 * cm, y, sowing[:10])
+        c.drawString(12.5 * cm, y, area[:12])
+        c.drawString(15 * cm, y, tier[:12])
+        y -= 0.42 * cm
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawString(2 * cm, 1.5 * cm, "Decision-support only — not an automated loan or claims decision.")
+    c.save()
+    return buffer.getvalue()

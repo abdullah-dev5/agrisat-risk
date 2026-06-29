@@ -1,5 +1,6 @@
 export type RiskTier = 'normal' | 'watch' | 'elevated' | 'high' | 'insufficient_data';
 export type DataTier = 'tier1_planet' | 'tier2_sen2sr' | 'tier3_sar';
+export type UserRole = 'admin' | 'loan_officer';
 
 export interface Field {
   id: string;
@@ -72,7 +73,35 @@ export interface PortfolioSummary {
 export interface Profile {
   id: string;
   institution_id: string;
-  role: 'admin' | 'loan_officer';
+  role: UserRole;
   full_name: string | null;
   email: string | null;
+}
+
+export interface TeamMember {
+  id: string;
+  role: UserRole;
+  full_name: string | null;
+  created_at: string;
+}
+
+export interface ImageryLayer {
+  thumb_url: string;
+  tiles: { mapid: string; token: string } | null;
+}
+
+export interface ImageryScene {
+  date: string;
+  cloud_pct: number;
+  ndvi_mean: number | null;
+  rgb: ImageryLayer;
+  ndvi: ImageryLayer;
+}
+
+export interface FieldImagery {
+  source: string;
+  latest: ImageryScene;
+  compare: ImageryScene | null;
+  ndvi_delta: number | null;
+  tile_url_template: string | null;
 }

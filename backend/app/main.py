@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from postgrest.exceptions import APIError
 
 from app.api.routes import auth_routes, fields, health, reports
 from app.core.config import get_settings
@@ -24,6 +28,14 @@ app.include_router(health.router)
 app.include_router(auth_routes.router, prefix="/api/v1")
 app.include_router(fields.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
+
+
+@app.exception_handler(APIError)
+async def supabase_api_error_handler(_request: Request, exc: APIError):
+    message = getattr(exc, "message", str(exc))
+    if getattr(exc, "code", "") == "PGRST116":
+        return JSONResponse(status_code=404, content={"detail": "Record not found"})
+    return JSONResponse(status_code=502, content={"detail": message or "Database query failed"})
 
 
 @app.get("/health")

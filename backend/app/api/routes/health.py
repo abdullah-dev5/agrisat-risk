@@ -45,6 +45,20 @@ async def supabase_health():
     return result
 
 
+@router.get("/sen2sr")
+async def sen2sr_health():
+    """Check Tier 2 (cloud-free S2 composite) availability."""
+    from app.services.tiers.gee_client import is_gee_configured
+
+    settings = get_settings()
+    return {
+        "enabled": settings.sen2sr_enabled,
+        "gee_configured": is_gee_configured(),
+        "available": settings.sen2sr_enabled and is_gee_configured(),
+        "pipeline": "gee_weekly_composite",
+    }
+
+
 @router.get("/gee")
 async def gee_health():
     """Check Google Earth Engine Tier 3 configuration and connectivity."""

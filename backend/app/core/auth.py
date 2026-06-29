@@ -28,6 +28,14 @@ class AuthUser:
 security = HTTPBearer(auto_error=False)
 
 
+def _first_row(data: Any) -> dict[str, Any] | None:
+    if data is None:
+        return None
+    if isinstance(data, list):
+        return data[0] if data else None
+    return data
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     settings: Settings = Depends(get_settings),
@@ -51,16 +59,16 @@ async def get_current_user(
         sb.table("profiles")
         .select("institution_id, role, full_name")
         .eq("id", user_id)
-        .single()
+        .limit(1)
         .execute()
     )
-    if not profile_resp.data:
+    profile = _first_row(profile_resp.data)
+    if not profile:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User profile not found. Complete institution registration first.",
         )
 
-    profile = profile_resp.data if isinstance(profile_resp.data, dict) else profile_resp.data[0]
     email = payload.get("email")
 
     return AuthUser(

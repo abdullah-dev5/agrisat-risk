@@ -91,7 +91,8 @@ def main() -> int:
     print(f"\nNext: start backend and open {api_url}/health/supabase")
 
     if args.rls:
-        print("\nRLS manual test: see docs/SUPABASE-SETUP.md section 9")
+        print("\nRun automated tenant isolation test: python scripts/verify_rls.py")
+        print("(Requires backend running + GEE configured for field creation step)")
 
     print("\nAll checks passed.")
     return 0
