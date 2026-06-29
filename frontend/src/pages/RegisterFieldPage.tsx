@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { parseBoundaryFile } from '../lib/boundaryParser';
 import { FieldsMap } from '../components/FieldsMap';
-import { PILOT_CROP } from '../lib/constants';
+import { PILOT_CROP, PILOT_DISTRICT_KEY } from '../lib/constants';
+
+type InputMode = 'draw' | 'upload';
 
 export function RegisterFieldPage() {
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [inputMode, setInputMode] = useState<InputMode>('draw');
   const [polygon, setPolygon] = useState<GeoJSON.Polygon | null>(null);
+  const [uploadName, setUploadName] = useState('');
   const [name, setName] = useState('');
   const [farmerRef, setFarmerRef] = useState('');
   const [loanRef, setLoanRef] = useState('');
@@ -14,10 +20,25 @@ export function RegisterFieldPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError('');
+    try {
+      const parsed = await parseBoundaryFile(file);
+      setPolygon(parsed);
+      setUploadName(file.name);
+      setInputMode('upload');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not parse boundary file');
+      setPolygon(null);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!polygon) {
-      setError('Draw a field boundary on the map — click at least three points.');
+      setError('Draw on the map or upload a GeoJSON / KML / coordinate file.');
       return;
     }
     setLoading(true);
@@ -46,18 +67,73 @@ export function RegisterFieldPage() {
           <span className="eyebrow">Field registration</span>
           <h1>Register a new field</h1>
           <p className="page-intro">
-            Draw the AOI boundary on the map, then attach crop metadata. Pilot crop: {PILOT_CROP}.
+            Draw on the map or upload a boundary file (GeoJSON, KML, or coordinate list). Pilot crop: {PILOT_CROP}.
           </p>
         </div>
       </div>
 
       <div className="register-layout">
         <div className="panel">
-          <FieldsMap fields={[]} drawMode onPolygonComplete={setPolygon} minHeight={460} />
+          <div className="boundary-tabs">
+            <button
+              type="button"
+              className={inputMode === 'draw' ? 'tab active' : 'tab'}
+              onClick={() => { setInputMode('draw'); setPolygon(null); setUploadName(''); }}
+            >
+              Draw on map
+            </button>
+            <button
+              type="button"
+              className={inputMode === 'upload' ? 'tab active' : 'tab'}
+              onClick={() => fileRef.current?.click()}
+            >
+              Upload file
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".geojson,.json,.kml,.txt,.csv"
+              hidden
+              onChange={handleFileChange}
+            />
+          </div>
+
+          {inputMode === 'draw' ? (
+            <FieldsMap
+              fields={[]}
+              drawMode
+              committedPolygon={polygon}
+              onPolygonComplete={setPolygon}
+              minHeight={420}
+            />
+          ) : (
+            <FieldsMap
+              fields={polygon ? [{
+                id: 'preview',
+                institution_id: '',
+                name: 'Preview',
+                boundary_geojson: polygon,
+                area_hectares: null,
+                crop_type: PILOT_CROP,
+                sowing_date: sowingDate,
+                farmer_ref_id: null,
+                loan_ref_id: null,
+                status: 'active',
+                resolution_warning: false,
+                pilot_district: PILOT_DISTRICT_KEY,
+                current_risk_tier: 'normal',
+                created_at: '',
+              }] : []}
+              minHeight={420}
+            />
+          )}
+
           <div className={`map-draw-hint ${polygon ? 'success' : ''}`}>
             {polygon
-              ? '✓ Boundary captured — review and submit the form'
-              : 'Click the map to place polygon vertices (minimum 3 points)'}
+              ? `✓ Boundary ready${uploadName ? ` — ${uploadName}` : ''}`
+              : inputMode === 'draw'
+                ? 'Use the pencil tool, place at least 3 points, then click Finish'
+                : 'Upload .geojson, .kml, or .txt coordinate list (lng, lat per line)'}
           </div>
         </div>
 

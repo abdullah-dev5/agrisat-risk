@@ -14,6 +14,6 @@
 | NFR-6 | Disclaimers in UI + risk explanations |
 | NFR-7 | Separate tier adapters, fusion, API, frontend layers |
 
-**Pilot defaults:** wheat · Faisalabad District (`config.py`, `constants.ts`)
+**Pilot defaults:** wheat · Matiari District (`config.py`, `constants.ts`)
 
 **Demo mode:** Without GEE/Planet credentials, Tier 3 uses synthetic readings (`demo_data.py`) so the full UI flow is testable locally.

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { signInWithPassword } from '../lib/auth';
 import { LogoMark } from '../components/ui/LogoMark';
 import { PILOT_CROP, PILOT_DISTRICT, PILOT_REGION } from '../lib/constants';
 
@@ -15,7 +15,7 @@ export function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: authError } = await signInWithPassword(email, password);
     setLoading(false);
     if (authError) {
       setError(authError.message);

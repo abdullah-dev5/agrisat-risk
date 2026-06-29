@@ -1,23 +1,36 @@
 import { useEffect, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { signOut as authSignOut } from '../lib/auth';
+import { getSupabaseClient } from '../lib/supabase';
+
+interface AuthUser {
+  id: string;
+  email: string;
+}
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
+    const sb = getSupabaseClient();
+
+    sb.auth.getSession().then(({ data }) => {
+      const s = data.session;
+      setUser(s?.user ? { id: s.user.id, email: s.user.email ?? '' } : null);
       setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? { id: session.user.id, email: session.user.email ?? '' } : null);
+      setLoading(false);
     });
 
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  return { user, loading, signOut: () => supabase.auth.signOut() };
+  return {
+    user,
+    loading,
+    signOut: () => authSignOut(),
+  };
 }

@@ -2,7 +2,7 @@
 
 Satellite-based parametric crop risk platform for agricultural lenders and insurers in Pakistan.
 
-**MVP scope:** Wheat monitoring in Faisalabad District, Punjab — decision-support only (not automated payout).
+**MVP scope:** Wheat monitoring in Matiari District, Sindh — decision-support only (not automated payout).
 
 ## Architecture
 

@@ -28,6 +28,7 @@ Step-by-step guide to connect your hosted Supabase project to the local backend 
 2. Paste and run, in order:
    - `supabase/migrations/001_initial_schema.sql`
    - `supabase/migrations/002_geometry_helpers.sql`
+   - (if 002 failed on `ST_AsGeoJSON`) `supabase/migrations/003_postgis_schema_fix.sql`
 3. Confirm no errors
 
 **Option B — Supabase CLI**

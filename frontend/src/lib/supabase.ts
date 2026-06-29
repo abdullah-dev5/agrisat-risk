@@ -1,11 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+let client: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export function getSupabaseClient(): SupabaseClient {
+  if (!client) {
+    const url = import.meta.env.VITE_SUPABASE_URL?.trim();
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+    if (!url || !key) {
+      throw new Error('Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env');
+    }
+    client = createClient(url, key);
+  }
+  return client;
+}
 
 export async function getAccessToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
+  const { data } = await getSupabaseClient().auth.getSession();
   return data.session?.access_token ?? null;
 }
