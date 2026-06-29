@@ -14,6 +14,14 @@ from app.services.geometry import compute_area_hectares, geojson_polygon, geojso
 from app.services.risk_engine import assess_risk
 
 
+def _first_row(data: Any) -> dict[str, Any] | None:
+    if data is None:
+        return None
+    if isinstance(data, list):
+        return data[0] if data else None
+    return data
+
+
 def _fetch_boundary_geojson(sb, field_id: str) -> dict[str, Any]:
     try:
         resp = sb.rpc("field_boundary_geojson", {"p_field_id": field_id}).execute()
@@ -45,7 +53,7 @@ def _field_response(sb, row: dict, risk_tier: str | None = None) -> FieldRespons
         loan_ref_id=row.get("loan_ref_id"),
         status=row["status"],
         resolution_warning=row.get("resolution_warning", False),
-        pilot_district=row.get("pilot_district", "faisalabad"),
+        pilot_district=row.get("pilot_district", "matiari"),
         current_risk_tier=risk_tier,
         created_at=row["created_at"],
     )
@@ -85,7 +93,9 @@ def create_field(
             "p_pilot_district": settings.pilot_district,
         },
     ).execute()
-    row = resp.data[0]
+    row = _first_row(resp.data)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Field insert failed")
     process_field(row["id"], settings)
     return get_field(row["id"], institution_id)
 
@@ -93,7 +103,8 @@ def create_field(
 def get_field(field_id: str, institution_id: str) -> FieldResponse:
     sb = get_supabase_admin()
     resp = sb.table("fields").select("*").eq("id", field_id).eq("institution_id", institution_id).single().execute()
-    if not resp.data:
+    row = _first_row(resp.data)
+    if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
 
     risk_resp = (
@@ -104,8 +115,9 @@ def get_field(field_id: str, institution_id: str) -> FieldResponse:
         .limit(1)
         .execute()
     )
-    risk_tier = risk_resp.data[0]["risk_tier"] if risk_resp.data else None
-    return _field_response(sb, resp.data[0], risk_tier)
+    risk_row = _first_row(risk_resp.data)
+    risk_tier = risk_row["risk_tier"] if risk_row else None
+    return _field_response(sb, row, risk_tier)
 
 
 def list_fields(institution_id: str, status_filter: str | None = "active") -> list[FieldResponse]:
@@ -138,7 +150,7 @@ def update_field(
 ) -> FieldResponse:
     sb = get_supabase_admin()
     existing = sb.table("fields").select("*").eq("id", field_id).eq("institution_id", institution_id).single().execute()
-    if not existing.data:
+    if not _first_row(existing.data):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
 
     updates: dict[str, Any] = {}
@@ -182,7 +194,8 @@ def update_field(
 def get_field_detail(field_id: str, institution_id: str) -> dict:
     sb = get_supabase_admin()
     field_resp = sb.table("fields").select("*").eq("id", field_id).eq("institution_id", institution_id).single().execute()
-    if not field_resp.data:
+    field_row = _first_row(field_resp.data)
+    if not field_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
 
     readings = (
@@ -196,8 +209,8 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
     baseline = (
         sb.table("baseline_stats")
         .select("*")
-        .eq("crop_type", field_resp.data["crop_type"])
-        .eq("pilot_district", field_resp.data["pilot_district"])
+        .eq("crop_type", field_row["crop_type"])
+        .eq("pilot_district", field_row["pilot_district"])
         .order("days_since_sowing")
         .execute()
         .data
@@ -212,18 +225,21 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
         .data
     )
 
-    risk_tier = assessment[0]["risk_tier"] if assessment else None
+    assessment_row = _first_row(assessment)
+    risk_tier = assessment_row["risk_tier"] if assessment_row else None
     return {
-        "field": _field_response(sb, field_resp.data, risk_tier),
+        "field": _field_response(sb, field_row, risk_tier),
         "vegetation_readings": readings,
         "baseline": baseline,
-        "current_assessment": assessment[0] if assessment else None,
+        "current_assessment": assessment_row,
     }
 
 
 def process_field(field_id: str, settings: Settings) -> None:
     sb = get_supabase_admin()
-    field = sb.table("fields").select("*").eq("id", field_id).single().execute().data
+    field = _first_row(sb.table("fields").select("*").eq("id", field_id).single().execute().data)
+    if not field:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
     sowing = date.fromisoformat(str(field["sowing_date"]))
     boundary = _boundary_from_row(sb, field)
     wkt = geojson_to_wkt(boundary)
@@ -293,7 +309,7 @@ def process_field(field_id: str, settings: Settings) -> None:
     result = assess_risk(fused_objs, baseline_rows, sowing, settings, rainfall_mm, rainfall_anomaly_pct)
 
     sb.table("risk_assessments").update({"is_current": False}).eq("field_id", field_id).execute()
-    assessment = sb.table("risk_assessments").insert({
+    assessment_resp = sb.table("risk_assessments").insert({
         "field_id": field_id,
         "days_since_sowing": result.days_since_sowing,
         "z_score": result.z_score,
@@ -306,7 +322,10 @@ def process_field(field_id: str, settings: Settings) -> None:
         "rainfall_anomaly_pct": result.rainfall_anomaly_pct,
         "explanation": result.explanation,
         "is_current": True,
-    }).execute().data[0]
+    }).execute()
+    assessment = _first_row(assessment_resp.data)
+    if not assessment:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Risk assessment insert failed")
 
     sb.table("risk_audit_log").insert({
         "field_id": field_id,

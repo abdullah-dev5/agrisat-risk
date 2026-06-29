@@ -1,7 +1,7 @@
 -- AgriSat Risk — initial schema (SRS v2.0)
--- Requires Supabase project with PostGIS enabled
+-- Supabase: enable PostGIS in Dashboard first, then run this migration
 
-CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
 
 -- Enums
 CREATE TYPE user_role AS ENUM ('admin', 'loan_officer');

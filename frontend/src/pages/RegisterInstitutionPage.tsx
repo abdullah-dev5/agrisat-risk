@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { supabase } from '../lib/supabase';
+import { signInWithPassword } from '../lib/auth';
 import { LogoMark } from '../components/ui/LogoMark';
 import { PILOT_CROP, PILOT_DISTRICT, PILOT_REGION } from '../lib/constants';
 
@@ -28,10 +28,7 @@ export function RegisterInstitutionPage() {
     setError('');
     try {
       await api.registerInstitution(form);
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: form.admin_email,
-        password: form.admin_password,
-      });
+      const { error: authError } = await signInWithPassword(form.admin_email, form.admin_password);
       if (authError) throw authError;
       navigate('/');
     } catch (err) {

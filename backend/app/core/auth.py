@@ -4,9 +4,10 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jose import JWTError
 
 from app.core.config import Settings, get_settings
+from app.core.jwt_verify import verify_supabase_token
 from app.core.supabase_client import get_supabase_admin
 
 
@@ -36,15 +37,12 @@ async def get_current_user(
 
     token = credentials.credentials
     try:
-        payload: dict[str, Any] = jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
+        payload: dict[str, Any] = verify_supabase_token(token, settings)
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except HTTPException:
+        raise
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
 
@@ -62,7 +60,7 @@ async def get_current_user(
             detail="User profile not found. Complete institution registration first.",
         )
 
-    profile = profile_resp.data
+    profile = profile_resp.data if isinstance(profile_resp.data, dict) else profile_resp.data[0]
     email = payload.get("email")
 
     return AuthUser(

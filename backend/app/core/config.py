@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     sen2sr_enabled: bool = True
 
     pilot_crop: str = "wheat"
-    pilot_district: str = "faisalabad"
-    pilot_region_bbox: str = "72.0,30.8,73.5,31.8"
+    pilot_district: str = "matiari"
+    pilot_region_bbox: str = "68.0,25.2,69.2,26.1"
 
     risk_threshold_watch: float = 1.0
     risk_threshold_elevated: float = 1.5

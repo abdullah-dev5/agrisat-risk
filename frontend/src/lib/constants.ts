@@ -24,8 +24,11 @@ export const TIER_LABELS: Record<string, string> = {
 };
 
 export const PILOT_CROP = 'wheat';
-export const PILOT_DISTRICT = 'Faisalabad District';
-export const PILOT_REGION = 'Punjab, Pakistan';
+export const PILOT_DISTRICT = 'Matiari District';
+export const PILOT_DISTRICT_KEY = 'matiari';
+export const PILOT_REGION = 'Sindh, Pakistan';
+/** Leaflet [lat, lng] — Matiari District center */
+export const PILOT_MAP_CENTER: [number, number] = [25.6, 68.45];
 
 export const MAP_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 export const MAP_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';

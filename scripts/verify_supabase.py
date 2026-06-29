@@ -29,8 +29,11 @@ def main() -> int:
         errors.append("SUPABASE_URL is not set in backend/.env")
     if not key:
         errors.append("SUPABASE_SERVICE_ROLE_KEY is not set in backend/.env")
-    if not jwt_secret:
-        errors.append("SUPABASE_JWT_SECRET is not set in backend/.env")
+    if not jwt_secret and not key.startswith(("sb_secret_", "sb_publishable_")):
+        errors.append(
+            "SUPABASE_JWT_SECRET is not set — required for legacy JWT service_role keys; "
+            "omit when using sb_secret_* keys with JWKS auth"
+        )
 
     if errors:
         for e in errors:
@@ -39,9 +42,9 @@ def main() -> int:
         return 1
 
     try:
-        from supabase import create_client
+        from app.core.supabase_client import get_supabase_admin
 
-        sb = create_client(url, key)
+        sb = get_supabase_admin()
     except Exception as exc:
         print(f"FAIL: Could not create Supabase client: {exc}")
         return 1

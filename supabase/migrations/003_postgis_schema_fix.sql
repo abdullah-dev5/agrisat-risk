@@ -1,4 +1,7 @@
--- M11: PostGIS geometry helpers + grants (Supabase: use extensions.ST_* explicitly)
+-- Run this AFTER 001 succeeds and 002 fails (Supabase PostGIS fix + remaining grants)
+-- Safe to re-run: uses CREATE OR REPLACE
+
+-- ─── Geometry RPCs (extensions schema on Supabase) ───
 
 CREATE OR REPLACE FUNCTION public.create_field_from_geojson(
   p_institution_id UUID,
@@ -75,6 +78,8 @@ BEGIN
 END;
 $$;
 
+-- ─── Grants (may not have run if 002 failed mid-file) ───
+
 GRANT EXECUTE ON FUNCTION public.create_field_from_geojson(
   UUID, UUID, TEXT, JSONB, NUMERIC, TEXT, DATE, TEXT, TEXT, BOOLEAN, TEXT
 ) TO service_role;
@@ -90,9 +95,13 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO service_role;
 
+-- ─── Verify ───
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
-    RAISE EXCEPTION 'PostGIS extension is required. Enable it in Supabase Dashboard > Database > Extensions.';
+    RAISE EXCEPTION 'Enable PostGIS: Database → Extensions → postgis';
   END IF;
 END $$;
+
+SELECT '003 applied — geometry RPCs ready' AS status;

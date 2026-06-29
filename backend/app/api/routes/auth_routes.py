@@ -7,6 +7,13 @@ from app.schemas.domain import InstitutionRegisterRequest, InstitutionResponse, 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _auth_error_detail(exc: Exception) -> str:
+    msg = getattr(exc, "message", None) or str(exc)
+    if hasattr(exc, "msg") and exc.msg:
+        msg = str(exc.msg)
+    return msg
+
+
 @router.post("/register-institution", response_model=InstitutionResponse)
 async def register_institution(payload: InstitutionRegisterRequest):
     sb = get_supabase_admin()
@@ -18,7 +25,7 @@ async def register_institution(payload: InstitutionRegisterRequest):
             "email_confirm": True,
         })
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_auth_error_detail(exc)) from exc
 
     user_id = auth_resp.user.id
 
@@ -64,7 +71,7 @@ async def invite_user(payload: InviteUserRequest, admin: AuthUser = Depends(requ
             "email_confirm": True,
         })
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_auth_error_detail(exc)) from exc
 
     sb.table("profiles").insert({
         "id": auth_resp.user.id,
