@@ -44,7 +44,7 @@ export function DashboardPage() {
           <div className="map-hero-overlay">
             <span className="eyebrow">Live map</span>
             <p style={{ fontSize: '0.875rem', marginTop: '0.35rem', color: 'var(--ink-muted)' }}>
-              {fields.length} field{fields.length !== 1 ? 's' : ''} monitored · click a boundary for detail
+              {fields.length} field{fields.length !== 1 ? 's' : ''} · satellite basemap · zoom for parcel detail
             </p>
           </div>
           <FieldsMap
@@ -52,6 +52,10 @@ export function DashboardPage() {
             onFieldClick={(f) => navigate(`/fields/${f.id}`)}
             className="map-container"
             minHeight={480}
+            defaultBasemap="satellite"
+            initialZoom={12}
+            fitToFields={fields.length > 0}
+            showInspector
           />
         </div>
 

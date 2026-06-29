@@ -109,6 +109,7 @@ class FieldDetailResponse(FieldResponse):
     vegetation_readings: list[VegetationReadingResponse] = []
     baseline: list[BaselinePointResponse] = []
     current_assessment: RiskAssessmentResponse | None = None
+    pipeline: dict | None = None
 
 
 class PortfolioSummaryResponse(BaseModel):

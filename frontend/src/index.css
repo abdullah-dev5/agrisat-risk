@@ -519,6 +519,79 @@ label {
   text-overflow: ellipsis;
 }
 
+/* ─── Map inspector & basemap layers ─── */
+.map-inspector {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-width: calc(100% - 5rem);
+  pointer-events: none;
+}
+
+.map-inspector-item {
+  padding: 0.3rem 0.55rem;
+  background: rgba(252, 250, 245, 0.92);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+.map-inspector-coords {
+  font-family: var(--font-ui);
+}
+
+.map-inspector-data {
+  padding: 0.3rem 0.55rem;
+  background: rgba(27, 61, 54, 0.9);
+  color: var(--cream);
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.map-container--layers .leaflet-top.leaflet-right {
+  top: 4.5rem;
+}
+
+.map-container--draw.map-container--layers .leaflet-top.leaflet-right {
+  top: 5.5rem;
+}
+
+.map-container .leaflet-control-layers {
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+}
+
+.map-container .leaflet-control-layers-expanded {
+  padding: 0.5rem 0.65rem !important;
+  background: rgba(252, 250, 245, 0.96) !important;
+  backdrop-filter: blur(8px);
+}
+
+.map-container .leaflet-control-layers-list label {
+  margin-bottom: 0.35rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.map-container .leaflet-control-zoom {
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-md) !important;
+}
+
 .stats-rail {
   display: flex;
   flex-direction: column;

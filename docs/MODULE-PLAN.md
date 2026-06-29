@@ -12,7 +12,7 @@
 | M0 | **Foundation** — repo, schema, env, docs | All | `main` | Done (initial push) |
 | M1 | **Auth & institutions** — register, invite, RLS, JWT | FR-1.x, NFR-4 | `feat/m1-auth-institutions` | Scaffold done |
 | M2 | **Field registration** — draw AOI, metadata, area validation | FR-2.x | `feat/m2-field-registration` | Draw + GeoJSON/KML upload done |
-| M3 | **Tier 3 pipeline** — GEE Sentinel-1/2 + CHIRPS | FR-3.1, FR-3.5–3.7 | `feat/m3-tier3-gee` | Demo data only |
+| M3 | **Tier 3 pipeline** — GEE Sentinel-1/2 + CHIRPS | FR-3.1, FR-3.5–3.7 | `feat/m3-tier3-gee` | Done (needs GEE credentials for live) |
 | M4 | **Tier 2 pipeline** — SEN2SR super-resolution | FR-3.2, FR-3.4, NFR-6 | `feat/m4-tier2-sen2sr` | Stub |
 | M5 | **Tier 1 pipeline** — PlanetScope E&R | FR-3.3, NFR-9 | `feat/m5-tier1-planet` | Stub (awaiting approval) |
 | M6 | **Fusion & storage** — tier selection, time-series persist | FR-3.4, FR-3.8–3.9 | `feat/m6-fusion` | Core logic done |
@@ -31,8 +31,9 @@
 Push 1 (initial)     → M0 on main
 Push 2               → M11 Supabase wire-up + env docs ✅
 Push 3               → M2 GeoJSON/KML upload + validation UX ✅
-Push 4               → M3 GEE live Tier 3 (next)
-Push 5               → M9 UI redesign (after design direction chosen)
+Push 4               → M3 GEE live Tier 3 ✅
+Push 5               → M9 satellite basemaps + map tools ✅
+Push 6               → M9 UI redesign (optional polish)
 Push 6               → M4 SEN2SR integration
 Push 7               → M5 Planet Tier 1 (when E&R approved)
 Push 8               → M10 report polish + portfolio PDF
@@ -60,10 +61,12 @@ Tier 3 (M3) before Tier 2/1 — matches SRS design rule FR-3.7.
 - [x] Preview polygon on map before save
 
 ### M3 — GEE Tier 3
-- [ ] Service account auth documented
-- [ ] Sentinel-2 NDVI + Sentinel-1 VV backscatter per AOI
-- [ ] CHIRPS rainfall anomaly for flag period
-- [ ] Graceful fallback message if GEE unavailable (NFR-5)
+- [x] Service account auth documented (`docs/GEE-SETUP.md`)
+- [x] Sentinel-2 NDVI + EVI + Sentinel-1 VV backscatter per AOI
+- [x] CHIRPS rainfall anomaly for flag period
+- [x] Graceful demo fallback when GEE unavailable (NFR-5)
+- [x] `/health/gee` + `scripts/verify_gee.py`
+- [ ] GEE credentials configured on your GCP project (you run this)
 
 ### M9 — Dashboard UI (redesign)
 - [ ] Distinct visual identity (not generic dark SaaS template)

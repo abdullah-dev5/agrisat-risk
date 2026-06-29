@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from datetime import date
 
 from app.models.enums import DataTier
-from app.services.tiers.base import Tier1Adapter, Tier2Adapter, Tier3Adapter, TierReading
+from app.services.tiers.base import (
+    Tier1Adapter,
+    Tier2Adapter,
+    Tier3Adapter,
+    TierFetchResult,
+    TierReading,
+)
 
 
 @dataclass
@@ -19,6 +25,12 @@ class FusedReading:
     index_value: float | None = None
 
 
+@dataclass
+class FusionResult:
+    readings: list[FusedReading]
+    pipeline: dict[str, str]
+
+
 def _primary_index(reading: TierReading) -> float | None:
     if reading.ndvi is not None:
         return reading.ndvi
@@ -31,14 +43,22 @@ def select_and_fuse(
     boundary_wkt: str,
     sowing_date: date,
     season_end: date | None = None,
-) -> list[FusedReading]:
+) -> FusionResult:
     tier1 = Tier1Adapter()
     tier2 = Tier2Adapter()
     tier3 = Tier3Adapter()
 
-    t1_by_date = {r.acquisition_date: r for r in tier1.fetch_readings(boundary_wkt, sowing_date, season_end)}
-    t2_by_date = {r.acquisition_date: r for r in tier2.fetch_readings(boundary_wkt, sowing_date, season_end)}
-    t3_by_date = {r.acquisition_date: r for r in tier3.fetch_readings(boundary_wkt, sowing_date, season_end)}
+    t1_readings = tier1.fetch_readings(boundary_wkt, sowing_date, season_end)
+    t1_result = TierFetchResult(
+        readings=t1_readings,
+        source="planet" if tier1.is_available() and t1_readings else "empty",
+    )
+    t2_result = tier2.fetch_with_meta(boundary_wkt, sowing_date, season_end)
+    t3_result = tier3.fetch_with_meta(boundary_wkt, sowing_date, season_end)
+
+    t1_by_date = {r.acquisition_date: r for r in t1_result.readings}
+    t2_by_date = {r.acquisition_date: r for r in t2_result.readings}
+    t3_by_date = {r.acquisition_date: r for r in t3_result.readings}
 
     all_dates = sorted(set(t1_by_date) | set(t2_by_date) | set(t3_by_date))
     fused: list[FusedReading] = []
@@ -84,4 +104,12 @@ def select_and_fuse(
             )
         )
 
-    return fused
+    pipeline = {
+        "tier1": t1_result.source,
+        "tier2": t2_result.source,
+        "tier3": t3_result.source,
+        "vegetation_source": t3_result.source,
+        "reading_count": str(len(fused)),
+    }
+
+    return FusionResult(readings=fused, pipeline=pipeline)

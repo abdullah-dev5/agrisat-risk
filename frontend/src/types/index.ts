@@ -55,6 +55,12 @@ export interface FieldDetail extends Field {
   vegetation_readings: VegetationReading[];
   baseline: BaselinePoint[];
   current_assessment: RiskAssessment | null;
+  pipeline?: {
+    vegetation_source?: string;
+    tier3?: string;
+    rainfall_source?: string;
+    reading_count?: string;
+  } | null;
 }
 
 export interface PortfolioSummary {

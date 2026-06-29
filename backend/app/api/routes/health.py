@@ -43,3 +43,11 @@ async def supabase_health():
             result["postgis_rpc"] = "ok"
 
     return result
+
+
+@router.get("/gee")
+async def gee_health():
+    """Check Google Earth Engine Tier 3 configuration and connectivity."""
+    from app.services.tiers.gee_client import gee_health_probe
+
+    return gee_health_probe()

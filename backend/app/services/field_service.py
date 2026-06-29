@@ -227,11 +227,24 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
 
     assessment_row = _first_row(assessment)
     risk_tier = assessment_row["risk_tier"] if assessment_row else None
+
+    audit_resp = (
+        sb.table("risk_audit_log")
+        .select("payload")
+        .eq("field_id", field_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    audit_row = _first_row(audit_resp.data)
+    pipeline = audit_row.get("payload") if audit_row else None
+
     return {
         "field": _field_response(sb, field_row, risk_tier),
         "vegetation_readings": readings,
         "baseline": baseline,
         "current_assessment": assessment_row,
+        "pipeline": pipeline,
     }
 
 
@@ -244,7 +257,9 @@ def process_field(field_id: str, settings: Settings) -> None:
     boundary = _boundary_from_row(sb, field)
     wkt = geojson_to_wkt(boundary)
 
-    fused = select_and_fuse(wkt, sowing)
+    fused_result = select_and_fuse(wkt, sowing)
+    fused = fused_result.readings
+    pipeline_meta = fused_result.pipeline
 
     sb.table("vegetation_readings").delete().eq("field_id", field_id).execute()
     for r in fused:
@@ -280,17 +295,23 @@ def process_field(field_id: str, settings: Settings) -> None:
 
     rainfall_mm = None
     rainfall_anomaly_pct = None
-    try:
-        from app.services.tiers.gee_client import fetch_chirps_rainfall
+    rainfall_source = "none"
+    from app.services.tiers.gee_client import fetch_chirps_rainfall, is_gee_configured
 
-        end = date.today()
-        start = end.replace(day=1)
-        ctx = fetch_chirps_rainfall(wkt, start, end)
-        rainfall_mm = ctx.period_mm
-        rainfall_anomaly_pct = ctx.anomaly_pct
-    except Exception:
+    if is_gee_configured():
+        try:
+            end = date.today()
+            start = end.replace(day=1)
+            ctx = fetch_chirps_rainfall(wkt, start, end)
+            rainfall_mm = ctx.period_mm
+            rainfall_anomaly_pct = ctx.anomaly_pct
+            rainfall_source = "gee_chirps"
+        except Exception:
+            rainfall_source = "gee_error"
+    elif settings.gee_allow_demo_fallback:
         rainfall_anomaly_pct = -25.0
         rainfall_mm = 12.0
+        rainfall_source = "demo_fallback"
 
     fused_objs = [
         FusedReading(
@@ -307,6 +328,12 @@ def process_field(field_id: str, settings: Settings) -> None:
     ]
 
     result = assess_risk(fused_objs, baseline_rows, sowing, settings, rainfall_mm, rainfall_anomaly_pct)
+
+    audit_payload = {
+        **result.audit_payload,
+        **pipeline_meta,
+        "rainfall_source": rainfall_source,
+    }
 
     sb.table("risk_assessments").update({"is_current": False}).eq("field_id", field_id).execute()
     assessment_resp = sb.table("risk_assessments").insert({
@@ -331,5 +358,5 @@ def process_field(field_id: str, settings: Settings) -> None:
         "field_id": field_id,
         "risk_assessment_id": assessment["id"],
         "event_type": "risk_assessed",
-        "payload": result.audit_payload,
+        "payload": audit_payload,
     }).execute()

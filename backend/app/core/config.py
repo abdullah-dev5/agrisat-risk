@@ -12,6 +12,8 @@ class Settings(BaseSettings):
 
     gee_service_account_email: str = ""
     gee_private_key_path: str = ""
+    gee_project: str = ""
+    gee_allow_demo_fallback: bool = True
 
     planet_api_key: str = ""
     sen2sr_model_path: str = "./models/sen2sr"
