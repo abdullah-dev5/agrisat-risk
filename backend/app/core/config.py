@@ -1,53 +1,53 @@
-from functools import lru_cache
-from pathlib import Path
-
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
-
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-
-    supabase_url: str = ""
-    supabase_service_role_key: str = ""
-    supabase_jwt_secret: str = ""
-
-    gee_service_account_email: str = ""
-    gee_private_key_path: str = ""
-    gee_project: str = ""
-
-    planet_api_key: str = ""
-    sen2sr_model_path: str = "./models/sen2sr"
-    sen2sr_enabled: bool = False
-
-    pilot_crop: str = "wheat"
-    pilot_district: str = "matiari"
-    pilot_region_bbox: str = "68.0,25.2,69.2,26.1"
-
-    risk_threshold_watch: float = 1.0
-    risk_threshold_elevated: float = 1.5
-    risk_threshold_high: float = 2.0
-
-    min_field_hectares: float = 0.2
-    max_field_hectares: float = 500.0
-
-    cors_origins: str = "http://localhost:5173"
-
-    @property
-    def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
-
-    @property
-    def resolved_gee_key_path(self) -> str:
-        if not self.gee_private_key_path:
-            return ""
-        path = Path(self.gee_private_key_path)
-        if path.is_absolute():
-            return str(path)
-        return str((BACKEND_ROOT / path).resolve())
-
-
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    supabase_jwt_secret: str = ""
+
+    gee_service_account_email: str = ""
+    gee_private_key_path: str = ""
+    gee_project: str = ""
+
+    planet_api_key: str = ""
+    sen2sr_model_path: str = "./models/sen2sr"
+    sen2sr_enabled: bool = True
+
+    pilot_crop: str = "wheat"
+    pilot_district: str = "matiari"
+    pilot_region_bbox: str = "68.0,25.2,69.2,26.1"
+
+    risk_threshold_watch: float = 1.0
+    risk_threshold_elevated: float = 1.5
+    risk_threshold_high: float = 2.0
+
+    min_field_hectares: float = 0.2
+    max_field_hectares: float = 500.0
+
+    cors_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def resolved_gee_key_path(self) -> str:
+        if not self.gee_private_key_path:
+            return ""
+        path = Path(self.gee_private_key_path)
+        if path.is_absolute():
+            return str(path)
+        return str((BACKEND_ROOT / path).resolve())
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

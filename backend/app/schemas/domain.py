@@ -36,6 +36,13 @@ class ProfileResponse(BaseModel):
     email: str | None = None
 
 
+class TeamMemberResponse(BaseModel):
+    id: str
+    role: UserRole
+    full_name: str | None = None
+    created_at: datetime
+
+
 class FieldCreateRequest(BaseModel):
     name: str | None = None
     boundary_geojson: dict[str, Any]
@@ -103,6 +110,27 @@ class RiskAssessmentResponse(BaseModel):
     rainfall_mm: float | None = None
     rainfall_anomaly_pct: float | None = None
     explanation: str
+
+
+class ImageryLayerResponse(BaseModel):
+    thumb_url: str
+    tiles: dict[str, str] | None = None
+
+
+class ImagerySceneResponse(BaseModel):
+    date: str
+    cloud_pct: float
+    ndvi_mean: float | None = None
+    rgb: ImageryLayerResponse
+    ndvi: ImageryLayerResponse
+
+
+class FieldImageryResponse(BaseModel):
+    source: str
+    latest: ImagerySceneResponse
+    compare: ImagerySceneResponse | None = None
+    ndvi_delta: float | None = None
+    tile_url_template: str | None = None
 
 
 class FieldDetailResponse(FieldResponse):

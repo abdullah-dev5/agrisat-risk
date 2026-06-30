@@ -121,7 +121,7 @@ class Tier2Adapter(TierAdapter):
             from app.services.tiers.sen2sr import fetch_tier2_readings
 
             readings = fetch_tier2_readings(boundary_wkt, sowing_date, season_end)
-            return TierFetchResult(readings=readings, source="sen2sr" if readings else "empty")
+            return TierFetchResult(readings=readings, source="sen2sr_gee" if readings else "empty")
         except Exception as exc:
             logger.warning("Tier 2 SEN2SR unavailable: %s", exc)
             return TierFetchResult(readings=[], source="empty")

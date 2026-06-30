@@ -1,12 +1,12 @@
 import type { RiskTier } from '../types';
 
-/** Refined risk palette — institutional, not neon dashboard defaults */
+/** WCAG AA–friendly risk palette on light backgrounds */
 export const RISK_COLORS: Record<RiskTier, string> = {
-  normal: '#3D6B5A',
-  watch: '#B8954A',
-  elevated: '#C4652E',
-  high: '#9B2C2C',
-  insufficient_data: '#8A8580',
+  normal: '#2F5A4A',
+  watch: '#7A5C1E',
+  elevated: '#9A4518',
+  high: '#7A1F1F',
+  insufficient_data: '#5C5854',
 };
 
 export const RISK_LABELS: Record<RiskTier, string> = {
@@ -19,7 +19,7 @@ export const RISK_LABELS: Record<RiskTier, string> = {
 
 export const TIER_LABELS: Record<string, string> = {
   tier1_planet: 'PlanetScope · 3m',
-  tier2_sen2sr: 'SEN2SR · 2.5m',
+  tier2_sen2sr: 'SEN2SR composite · 10m',
   tier3_sar: 'Sentinel-1 SAR',
 };
 

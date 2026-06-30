@@ -1,4 +1,8 @@
-"""Tier 1 — PlanetScope placeholder (requires E&R Program API key)."""
+"""Tier 1 — PlanetScope placeholder (requires E&R Program API key).
+
+When Planet is not licensed, fusion falls back to Tier 2 (GEE weekly S2 composites)
+then Tier 3 (Sentinel-1/2 + CHIRPS). No separate alternative pipeline is required.
+"""
 
 from datetime import date
 
@@ -10,5 +14,5 @@ def fetch_tier1_readings(
     sowing_date: date,
     season_end: date | None = None,
 ) -> list[TierReading]:
-    # TODO: Planet Data API integration once E&R approval is granted
+    # Planet Data API integration once E&R approval is granted (M5).
     return []

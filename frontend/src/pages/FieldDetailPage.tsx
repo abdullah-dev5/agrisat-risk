@@ -6,6 +6,7 @@ import type { FieldDetail, RiskAssessment } from '../types';
 import { FieldsMap } from '../components/FieldsMap';
 import { RiskBadge } from '../components/RiskBadge';
 import { VegetationChart } from '../components/VegetationChart';
+import { FieldGeeImagery } from '../components/FieldGeeImagery';
 import { LoadingScreen } from '../components/ui/LoadingScreen';
 import { TIER_LABELS } from '../lib/constants';
 
@@ -197,7 +198,7 @@ export function FieldDetailPage() {
 
       <p className="disclaimer">
         Decision-support information only — not an automated loan or claims decision.
-        {a?.primary_data_tier === 'tier2_sen2sr' && ' Some readings use SEN2SR AI super-resolution (model-based reconstruction, not direct observation).'}
+        {a?.primary_data_tier === 'tier2_sen2sr' && ' Some readings use cloud-free Sentinel-2 weekly composites (Tier 2).'}
       </p>
 
       <div className="grid-2" style={{ marginTop: '1.5rem' }}>
@@ -232,6 +233,8 @@ export function FieldDetailPage() {
           <VegetationChart readings={detail.vegetation_readings} baseline={detail.baseline} />
         </div>
       </div>
+
+      {id && <FieldGeeImagery fieldId={id} />}
     </>
   );
 }

@@ -1,6 +1,8 @@
 """Field CRUD and processing orchestration."""
 
 import logging
+import threading
+import time
 from datetime import date
 from typing import Any
 
@@ -10,13 +12,32 @@ from app.core.config import Settings
 from app.core.supabase_client import get_supabase_admin
 from app.models.enums import DataTier
 from app.schemas.domain import FieldCreateRequest, FieldResponse, FieldUpdateRequest
-from app.services.baseline import build_gee_baseline
+from app.services.baseline import ensure_district_baseline
 from app.services.fusion import FusedReading, FusionResult, select_and_fuse
 from app.services.geometry import compute_area_hectares, geojson_polygon, geojson_to_wkt, validate_field_area
 from app.services.risk_engine import assess_risk
 from app.services.vegetation_index import index_family_for_tier
 
 logger = logging.getLogger(__name__)
+
+_IMAGERY_CACHE: dict[str, tuple[float, dict]] = {}
+_IMAGERY_CACHE_LOCK = threading.Lock()
+_IMAGERY_CACHE_TTL_SEC = 600
+
+
+def _require_field_row(sb, field_id: str, institution_id: str, columns: str = "*") -> dict[str, Any]:
+    resp = (
+        sb.table("fields")
+        .select(columns)
+        .eq("id", field_id)
+        .eq("institution_id", institution_id)
+        .limit(1)
+        .execute()
+    )
+    row = _first_row(resp.data)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
+    return row
 
 
 def _load_baselines(sb, crop_type: str, pilot_district: str) -> list[dict]:
@@ -28,47 +49,6 @@ def _load_baselines(sb, crop_type: str, pilot_district: str) -> list[dict]:
         .execute()
     )
     return resp.data or []
-
-
-def _ensure_gee_baselines(
-    sb,
-    wkt: str,
-    sowing: date,
-    crop_type: str,
-    pilot_district: str,
-) -> list[dict]:
-    """Build and persist live GEE baselines for crop + district."""
-    from app.services.tiers.gee_client import is_gee_configured
-
-    if not is_gee_configured():
-        return _load_baselines(sb, crop_type, pilot_district)
-
-    try:
-        rows = build_gee_baseline(wkt, sowing)
-    except Exception as exc:
-        logger.warning("GEE baseline build failed: %s", exc)
-        return _load_baselines(sb, crop_type, pilot_district)
-
-    if not rows:
-        return _load_baselines(sb, crop_type, pilot_district)
-
-    # Replace stale demo / mismatched baselines for this crop + district
-    sb.table("baseline_stats").delete().eq("crop_type", crop_type).eq(
-        "pilot_district", pilot_district
-    ).execute()
-
-    for b in rows:
-        payload = {"crop_type": crop_type, "pilot_district": pilot_district, **b}
-        try:
-            sb.table("baseline_stats").insert(payload).execute()
-        except Exception as exc:
-            # Pre-migration 005: one row per growth stage — keep first tier inserted (SAR listed first)
-            if "23505" in str(exc):
-                logger.debug("Baseline day %s tier skipped (schema upgrade 005 pending)", b.get("days_since_sowing"))
-                continue
-            raise
-
-    return _load_baselines(sb, crop_type, pilot_district)
 
 
 def _first_row(data: Any) -> dict[str, Any] | None:
@@ -170,10 +150,7 @@ def create_field(
 
 def get_field(field_id: str, institution_id: str) -> FieldResponse:
     sb = get_supabase_admin()
-    resp = sb.table("fields").select("*").eq("id", field_id).eq("institution_id", institution_id).single().execute()
-    row = _first_row(resp.data)
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
+    row = _require_field_row(sb, field_id, institution_id)
 
     risk_resp = (
         sb.table("risk_assessments")
@@ -217,8 +194,15 @@ def update_field(
     settings: Settings,
 ) -> FieldResponse:
     sb = get_supabase_admin()
-    existing = sb.table("fields").select("*").eq("id", field_id).eq("institution_id", institution_id).single().execute()
-    if not _first_row(existing.data):
+    if not _first_row(
+        sb.table("fields")
+        .select("id")
+        .eq("id", field_id)
+        .eq("institution_id", institution_id)
+        .limit(1)
+        .execute()
+        .data
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
 
     updates: dict[str, Any] = {}
@@ -261,10 +245,7 @@ def update_field(
 
 def get_field_detail(field_id: str, institution_id: str) -> dict:
     sb = get_supabase_admin()
-    field_resp = sb.table("fields").select("*").eq("id", field_id).eq("institution_id", institution_id).single().execute()
-    field_row = _first_row(field_resp.data)
-    if not field_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
+    field_row = _require_field_row(sb, field_id, institution_id)
 
     readings = (
         sb.table("vegetation_readings")
@@ -326,7 +307,9 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
 
 def process_field(field_id: str, settings: Settings) -> None:
     sb = get_supabase_admin()
-    field = _first_row(sb.table("fields").select("*").eq("id", field_id).single().execute().data)
+    field = _first_row(
+        sb.table("fields").select("*").eq("id", field_id).limit(1).execute().data
+    )
     if not field:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
     sowing = date.fromisoformat(str(field["sowing_date"]))
@@ -367,8 +350,12 @@ def process_field(field_id: str, settings: Settings) -> None:
             "is_fused": True,
         }).execute()
 
-    baseline_rows = _ensure_gee_baselines(
-        sb, wkt, sowing, field["crop_type"], field["pilot_district"]
+    baseline_rows = ensure_district_baseline(
+        sb,
+        settings,
+        field["crop_type"],
+        field["pilot_district"],
+        sowing,
     )
 
     rainfall_mm = None
@@ -434,3 +421,50 @@ def process_field(field_id: str, settings: Settings) -> None:
         "event_type": "risk_assessed",
         "payload": audit_payload,
     }).execute()
+
+
+def get_field_imagery(field_id: str, institution_id: str) -> dict:
+    from app.services.gee_imagery import fetch_field_imagery
+    from app.services.tiers.gee_client import GEEError, is_gee_configured
+
+    cache_key = f"{field_id}:{institution_id}"
+    now = time.time()
+    with _IMAGERY_CACHE_LOCK:
+        cached = _IMAGERY_CACHE.get(cache_key)
+        if cached and now - cached[0] < _IMAGERY_CACHE_TTL_SEC:
+            return cached[1]
+
+    if not is_gee_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="GEE imagery requires Google Earth Engine credentials.",
+        )
+
+    sb = get_supabase_admin()
+    row = _require_field_row(sb, field_id, institution_id, columns="sowing_date")
+
+    boundary = _boundary_from_row(sb, {"id": field_id})
+    if not boundary.get("coordinates"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Field boundary is missing — re-save the field polygon and try again.",
+        )
+    try:
+        wkt = geojson_to_wkt(boundary)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    sowing = date.fromisoformat(str(row["sowing_date"]))
+    try:
+        result = fetch_field_imagery(wkt, sowing)
+    except GEEError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("GEE imagery generation failed for field %s", field_id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Satellite imagery generation failed: {exc}",
+        ) from exc
+
+    with _IMAGERY_CACHE_LOCK:
+        _IMAGERY_CACHE[cache_key] = (time.time(), result)
+    return result

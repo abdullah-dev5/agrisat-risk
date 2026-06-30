@@ -4,7 +4,7 @@ from fastapi.responses import Response
 from app.core.auth import AuthUser, get_current_user
 from app.schemas.domain import PortfolioSummaryResponse
 from app.services import field_service
-from app.services.report_service import generate_field_pdf, generate_portfolio_csv
+from app.services.report_service import generate_field_pdf, generate_portfolio_csv, generate_portfolio_pdf
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -35,6 +35,16 @@ async def field_pdf(field_id: str, user: AuthUser = Depends(get_current_user)):
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="field-{field_id}.pdf"'},
+    )
+
+
+@router.get("/portfolio/pdf")
+async def portfolio_pdf(user: AuthUser = Depends(get_current_user)):
+    pdf_bytes = generate_portfolio_pdf(user.institution_id)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="portfolio-summary.pdf"'},
     )
 
 

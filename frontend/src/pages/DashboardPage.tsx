@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, downloadReport } from '../lib/api';
 import type { Field, PortfolioSummary, RiskTier } from '../types';
 import { FieldsMap } from '../components/FieldsMap';
 import { RiskBadge } from '../components/RiskBadge';
@@ -13,6 +13,7 @@ export function DashboardPage() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState<'csv' | 'pdf' | null>(null);
 
   useEffect(() => {
     Promise.all([api.listFields(), api.portfolioSummary()])
@@ -22,6 +23,18 @@ export function DashboardPage() {
   }, []);
 
   if (loading) return <LoadingScreen label="Loading portfolio overview…" />;
+
+  async function handleExport(kind: 'csv' | 'pdf') {
+    setExporting(kind);
+    setError('');
+    try {
+      await downloadReport(`/api/v1/reports/portfolio/${kind}`, `portfolio-summary.${kind}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(null);
+    }
+  }
 
   const tiers: RiskTier[] = ['normal', 'watch', 'elevated', 'high'];
 
@@ -35,6 +48,26 @@ export function DashboardPage() {
             Satellite-derived crop risk for your registered portfolio. Use the map layers icon for Satellite (sharp) vs Sentinel-2 (crop context). Decision-support only.
           </p>
         </div>
+        {fields.length > 0 && (
+          <div className="page-header-actions">
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={!!exporting}
+              onClick={() => handleExport('csv')}
+            >
+              {exporting === 'csv' ? 'Exporting…' : 'Export CSV'}
+            </button>
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={!!exporting}
+              onClick={() => handleExport('pdf')}
+            >
+              {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <p className="error">{error}</p>}
