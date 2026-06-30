@@ -149,8 +149,10 @@ def main() -> int:
     cross_live = get_field(token_b, field_id)
     cross_asgi = cross_tenant_status(token_b, field_id)
     if cross_asgi in (404, 403):
-        print("[OK] Org B blocked — tenant isolation verified (JWT + institution filter)")
-        if cross_live.status_code not in (404, 403):
+        if cross_live.status_code in (404, 403):
+            print("[OK] Org B blocked — live API tenant isolation verified")
+        else:
+            print("[OK] Org B blocked — tenant isolation verified (JWT + institution filter)")
             print(
                 f"[WARN] Live HTTP returned {cross_live.status_code}; "
                 "restart uvicorn to pick up latest backend code"

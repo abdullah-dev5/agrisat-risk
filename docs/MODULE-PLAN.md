@@ -32,6 +32,7 @@
 | Live GEE field imagery (RGB + NDVI preview) | Done |
 | Matiari pilot migration (004) + baseline-per-tier (005) | Done |
 | Vite dev proxy + imagery cache | Done |
+| In-app Guide (`/guide`) — plain + technical documentation | Done |
 
 ---
 

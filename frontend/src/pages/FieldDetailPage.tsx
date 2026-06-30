@@ -155,6 +155,12 @@ export function FieldDetailPage() {
             </p>
           )}
 
+          <p className="risk-brief-note">
+            <Link to="/guide#risk-scoring" className="guide-inline-link">How risk scoring works</Link>
+            {' · '}
+            <Link to="/guide#baseline" className="guide-inline-link">Understanding the baseline</Link>
+          </p>
+
           <div className="risk-meta-grid">
             <div className="risk-meta-item">
               <div className="meta-label">Z-score</div>

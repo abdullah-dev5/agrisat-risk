@@ -45,7 +45,8 @@ export function DashboardPage() {
           <span className="eyebrow">Portfolio overview</span>
           <h1>{PILOT_CROP} · {PILOT_DISTRICT}</h1>
           <p className="page-intro">
-            Satellite-derived crop risk for your registered portfolio. Use the map layers icon for Satellite (sharp) vs Sentinel-2 (crop context). Decision-support only.
+            Satellite-derived crop risk for your registered portfolio. Use the map layers icon for Satellite (sharp) vs Sentinel-2 (crop context).{' '}
+            <Link to="/guide">Read the guide</Link> for how baselines and risk flags are calculated. Decision-support only.
           </p>
         </div>
         {fields.length > 0 && (

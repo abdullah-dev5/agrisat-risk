@@ -73,8 +73,18 @@ With the backend running: http://localhost:8000/docs
 
 ## Documentation
 
-- [Module plan](docs/MODULE-PLAN.md) — delivery order and acceptance criteria
+- [Module plan](docs/MODULE-PLAN.md) — delivery order and acceptance criteria (MVP complete)
 - [Supabase setup](docs/SUPABASE-SETUP.md) — **start here after clone (M11)**
+- [GEE setup](docs/GEE-SETUP.md) — Google Earth Engine service account
 - [Git workflow](docs/GIT-WORKFLOW.md) — branch and commit conventions
-- [UI/UX inspiration](docs/UI-UX-INSPIRATION.md) — design directions (pick before M9 redesign)
 - [SRS traceability](docs/SRS-traceability.md) — requirement → code map
+- **In-app Guide** — http://localhost:5173/guide (plain-language + technical tutorials)
+
+## Verify stack
+
+```bash
+python scripts/verify_supabase.py
+python scripts/verify_rls.py      # requires backend on :8000
+python scripts/verify_gee.py      # GEE credentials
+python scripts/test_e2e_flows.py
+```
