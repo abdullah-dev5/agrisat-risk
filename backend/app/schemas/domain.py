@@ -76,7 +76,16 @@ class FieldResponse(BaseModel):
     resolution_warning: bool
     pilot_district: str
     current_risk_tier: RiskTier | None = None
+    processing_status: str | None = None
+    processing_error: str | None = None
     created_at: datetime
+
+
+class FieldProcessingStatusResponse(BaseModel):
+    field_id: str
+    status: str
+    error: str | None = None
+    updated_at: datetime | None = None
 
 
 class VegetationReadingResponse(BaseModel):

@@ -36,5 +36,9 @@ Thumbs.db
 gee-service-account.json
 service-account*.json
 
+# Trained model weights (run scripts/bootstrap_ml_models.py)
+backend/models/**/*.pt
+backend/models/**/*.joblib
+
 # Reports temp
 backend/reports/*.pdf

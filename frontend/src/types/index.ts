@@ -16,7 +16,16 @@ export interface Field {
   resolution_warning: boolean;
   pilot_district: string;
   current_risk_tier: RiskTier | null;
+  processing_status?: string | null;
+  processing_error?: string | null;
   created_at: string;
+}
+
+export interface FieldProcessingStatus {
+  field_id: string;
+  status: 'idle' | 'processing' | 'ready' | 'failed' | string;
+  error: string | null;
+  updated_at: string | null;
 }
 
 export interface VegetationReading {
@@ -58,9 +67,17 @@ export interface FieldDetail extends Field {
   current_assessment: RiskAssessment | null;
   pipeline?: {
     vegetation_source?: string;
+    tier1?: string;
+    tier2?: string;
     tier3?: string;
     rainfall_source?: string;
     reading_count?: string;
+    ml?: {
+      stress_probability?: number;
+      predicted_tier?: string;
+      model_version?: string;
+      class_probabilities?: Record<string, number>;
+    };
   } | null;
 }
 

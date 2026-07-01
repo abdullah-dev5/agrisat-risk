@@ -7,7 +7,7 @@
 | FR-3.1–3.9 | `services/tiers/*`, `fusion.py`, `vegetation_readings` table |
 | FR-3.7 | Tier 3 demo/GEE path always runs; Tier 1/2 optional |
 | FR-4.1–4.3 | `baseline.py`, `baseline_stats` table |
-| FR-5.1–5.4 | `risk_engine.py`, `risk_assessments`, `risk_audit_log` |
+| FR-5.1–5.5 | `risk_engine.py`, `ml_risk.py`, `risk_assessments`, `risk_audit_log` |
 | FR-6.1–6.4 | `DashboardPage`, `FieldDetailPage`, `FieldsMap`, `VegetationChart` |
 | FR-7.1–7.2 | `report_service.py`, PDF/CSV endpoints |
 | NFR-4 | Supabase Auth JWT + RLS institution isolation |

@@ -13,7 +13,7 @@
 | M1 | **Auth & institutions** — register, invite, RLS, JWT | Done |
 | M2 | **Field registration** — draw AOI, metadata, area validation | Done |
 | M3 | **Tier 3 pipeline** — GEE Sentinel-1/2 + CHIRPS | Done (live GEE required) |
-| M4 | **Tier 2 pipeline** — GEE weekly S2 composites (SEN2SR path) | Done (GEE composites; local model optional) |
+| M4 | **Tier 2 pipeline** — local SEN2SR + GEE weekly S2 fallback | Done |
 | M5 | **Tier 1 pipeline** — PlanetScope E&R | Deferred (Tier 2/3 fallback sufficient for MVP) |
 | M6 | **Fusion & storage** — tier selection, time-series persist | Done |
 | M7 | **Baseline engine** — district GEE multi-year stats | Done |
@@ -21,7 +21,7 @@
 | M9 | **Dashboard UI** — map, charts, flags, mobile | Done |
 | M10 | **Reporting** — PDF field + portfolio, CSV export | Done |
 | M11 | **Supabase production setup** — migrations, secrets, RLS test | Done |
-| M12 | **ML layer (post-MVP)** — gradient-boosted model | Out of scope |
+| M12 | **ML layer** — gradient-boosted stress classifier | Done |
 
 ---
 
@@ -32,6 +32,9 @@
 | Live GEE field imagery (RGB + NDVI preview) | Done |
 | Matiari pilot migration (004) + baseline-per-tier (005) | Done |
 | Vite dev proxy + imagery cache | Done |
+| Async GEE processing + `/fields/{id}/processing` poll API | Done |
+| Production hardening (security headers, job queue, docs) | Done |
+| In-app Guide (`/guide`) — plain + technical documentation | Done |
 
 ---
 
@@ -41,7 +44,7 @@
 - [x] Migration SQL + geometry RPC helpers
 - [x] Setup guide (`docs/SUPABASE-SETUP.md`)
 - [x] Verify script (`scripts/verify_supabase.py`) + `/health/supabase`
-- [x] Migrations 004–005 applied (pooler or SQL Editor)
+- [x] Migrations 004–006 applied (pooler or SQL Editor)
 - [x] RLS verified via `scripts/verify_rls.py` (API tenant isolation)
 
 ### M1 — Auth & institutions
@@ -56,9 +59,15 @@
 - [x] No demo fallback — GEE required for field processing
 
 ### M4 — Tier 2
-- [x] Weekly cloud-masked S2 composites via GEE
-- [x] `/health/sen2sr` when `SEN2SR_ENABLED=true`
-- [ ] Local SEN2SR model (optional future)
+- [x] Weekly cloud-masked S2 composites via GEE (fallback)
+- [x] Local SEN2SR PyTorch model on GEE reflectance patches
+- [x] `/health/sen2sr` reports `sen2sr_local` vs `gee_weekly_composite`
+- [x] `scripts/train_sen2sr_local.py` + `scripts/bootstrap_ml_models.py`
+
+### M12 — ML risk layer
+- [x] Gradient-boosted classifier (`ml_risk.py`) overlays z-score tiers
+- [x] Elevate-only blend when ML confidence ≥ `ML_RISK_CONFIDENCE_MIN`
+- [x] `/health/ml` + `scripts/train_ml_risk_model.py`
 
 ### M9 — Dashboard UI
 - [x] Canopy design system · map-first layout
@@ -76,7 +85,6 @@
 - Farmer-facing app
 - Automated insurance payout
 - M5 PlanetScope (until E&R license confirmed)
-- M12 supervised ML (FR-5.5)
 
 ---
 

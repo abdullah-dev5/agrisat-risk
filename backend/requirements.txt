@@ -14,9 +14,11 @@ Pillow==11.1.0
 pandas==2.2.3
 reportlab==4.2.5
 python-multipart==0.0.20
+scikit-learn>=1.5.0
+joblib>=1.4.0
 
 # Tier 3 — Google Earth Engine (configure GEE_* in .env)
 earthengine-api>=1.4.0
 
-# Optional — install when SEN2SR is enabled
+# M4 local SEN2SR — optional PyTorch weights (scripts/train_sen2sr_local.py)
 # torch>=2.0.0
