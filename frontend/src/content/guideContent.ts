@@ -110,8 +110,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           },
           {
             label: TIER_LABELS.tier2_sen2sr,
-            plain: 'Enhanced Sentinel-2 weekly composites (~10 m effective) when enabled.',
-            technical: 'GEE cloud-masked weekly medians; local SEN2SR model optional future path.',
+            plain: 'Enhanced Sentinel-2 via local super-resolution model on GEE patches; falls back to weekly GEE composites.',
+            technical: 'sen2sr_local.py + Sen2srNet (PyTorch); fallback fetch_tier2_composite_from_gee().',
           },
           {
             label: TIER_LABELS.tier3_sar,
@@ -251,6 +251,41 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     ],
   },
   {
+    id: 'ml-layer',
+    title: 'ML stress model (M12)',
+    summary: 'Gradient-boosted classifier augments z-score rules.',
+    blocks: [
+      {
+        plain:
+          'After the z-score assigns a risk tier, a machine-learning model reviews the same field context — growth stage, vegetation level, rainfall, and recent trend. ' +
+          'It estimates a crop-stress probability. The z-score tier stays primary for explainability; ML can only elevate the tier when it strongly agrees.',
+        technical:
+          'sklearn GradientBoostingClassifier on 10 features (days_since_sowing, index, baseline μ/σ, z, rainfall, SAR flag, NDVI trend, reading count). ' +
+          'apply_ml_overlay() in ml_risk.py; audit payload key ml.',
+      },
+      {
+        heading: 'Training & deployment',
+        bullets: [
+          {
+            label: 'Bootstrap',
+            plain: 'Run the bootstrap script once after clone to create starter models.',
+            technical: 'python scripts/bootstrap_ml_models.py → models/ml_risk/model.joblib',
+          },
+          {
+            label: 'Retrain from portfolio',
+            plain: 'As you accumulate assessed fields, retrain on real outcomes.',
+            technical: 'python scripts/train_ml_risk_model.py --from-db (≥50 assessments)',
+          },
+          {
+            label: 'Health check',
+            plain: 'Backend /health/ml shows whether the model is loaded.',
+            technical: 'ML_RISK_ENABLED, ML_RISK_ELEVATE_ONLY, ML_RISK_CONFIDENCE_MIN in .env',
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: 'rainfall',
     title: 'Rainfall cross-check',
     summary: 'CHIRPS rainfall adds context to vegetation stress.',
@@ -370,8 +405,8 @@ export const GLOSSARY: GlossaryTerm[] = [
   },
   {
     term: 'SEN2SR',
-    plain: 'AI-enhanced Sentinel-2 imagery for sharper optical views when Tier 1 is unavailable.',
-    technical: 'Tier 2 weekly GEE composites; optional local super-resolution model path.',
+    plain: 'AI-enhanced Sentinel-2 imagery — local PyTorch model super-resolves GEE reflectance patches for sharper NDVI.',
+    technical: 'Sen2srNet 2× upscale; weights at models/sen2sr/model.pt; train via scripts/train_sen2sr_local.py.',
   },
   {
     term: 'GEE',

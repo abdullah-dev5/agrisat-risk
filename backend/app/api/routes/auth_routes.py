@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.core.auth import AuthUser, get_current_user, require_admin
 from app.core.config import get_settings
+from app.core.security import verify_registration_allowed
 from app.core.supabase_client import get_supabase_admin
 from app.schemas.domain import (
     InstitutionRegisterRequest,
@@ -27,7 +28,8 @@ def _app_redirect_url() -> str:
 
 
 @router.post("/register-institution", response_model=InstitutionResponse)
-async def register_institution(payload: InstitutionRegisterRequest):
+async def register_institution(payload: InstitutionRegisterRequest, request: Request):
+    verify_registration_allowed(request)
     sb = get_supabase_admin()
 
     try:

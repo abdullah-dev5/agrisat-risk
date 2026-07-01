@@ -1510,6 +1510,32 @@ table.data-table {
   box-shadow: none;
 }
 
+.processing-banner {
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--forest);
+  font-size: 0.9rem;
+}
+
+.processing-banner p {
+  margin: 0.35rem 0 0;
+  color: var(--ink-muted);
+}
+
+.ml-insight {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(184, 149, 74, 0.1);
+  border: 1px solid rgba(184, 149, 74, 0.25);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.ml-insight .eyebrow {
+  margin-bottom: 0.35rem;
+}
+
 .boundary-tabs .tab:hover:not(.active) {
   background: rgba(27, 61, 54, 0.06);
   transform: none;

@@ -75,7 +75,7 @@ With the backend running: http://localhost:8000/docs
 
 - [Module plan](docs/MODULE-PLAN.md) — delivery order and acceptance criteria (MVP complete)
 - [Supabase setup](docs/SUPABASE-SETUP.md) — **start here after clone (M11)**
-- [GEE setup](docs/GEE-SETUP.md) — Google Earth Engine service account
+- [Production deployment](docs/PRODUCTION.md) — Gunicorn, Docker, security, timeouts
 - [Git workflow](docs/GIT-WORKFLOW.md) — branch and commit conventions
 - [SRS traceability](docs/SRS-traceability.md) — requirement → code map
 - **In-app Guide** — http://localhost:5173/guide (plain-language + technical tutorials)
@@ -86,5 +86,6 @@ With the backend running: http://localhost:8000/docs
 python scripts/verify_supabase.py
 python scripts/verify_rls.py      # requires backend on :8000
 python scripts/verify_gee.py      # GEE credentials
+python scripts/bootstrap_ml_models.py  # M4 SEN2SR + M12 ML weights
 python scripts/test_e2e_flows.py
 ```

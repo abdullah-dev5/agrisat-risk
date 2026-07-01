@@ -146,6 +146,14 @@ def ensure_district_baseline(
     if existing and _baseline_is_fresh(existing) and not force:
         return existing
 
+    if not force and not settings.baseline_build_on_request:
+        if existing:
+            logger.info(
+                "Using stale district baseline (%d rows); on-request build disabled",
+                len(existing),
+            )
+        return existing
+
     if not is_gee_configured():
         return existing
 

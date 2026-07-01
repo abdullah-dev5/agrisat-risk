@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PENDING = [
     ROOT / "supabase" / "migrations" / "004_matiari_pilot_district.sql",
     ROOT / "supabase" / "migrations" / "005_baseline_per_tier.sql",
+    ROOT / "supabase" / "migrations" / "006_field_processing_status.sql",
 ]
 
 POOLER_REGIONS = (

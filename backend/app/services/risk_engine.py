@@ -198,7 +198,7 @@ def assess_risk(
             risk_tier = RiskTier.WATCH
             explanation += " Rainfall context suggests this anomaly may not be drought-related."
 
-    return RiskResult(
+    base = RiskResult(
         days_since_sowing=latest.days_since_sowing,
         z_score=round(z, 4),
         risk_tier=risk_tier,
@@ -221,3 +221,7 @@ def assess_risk(
             "rainfall_anomaly_pct": rainfall_anomaly_pct,
         },
     )
+
+    from app.services.ml_risk import apply_ml_overlay
+
+    return apply_ml_overlay(base, fused_readings, settings, rainfall_mm, rainfall_anomaly_pct)

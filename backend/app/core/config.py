@@ -20,6 +20,19 @@ class Settings(BaseSettings):
     planet_api_key: str = ""
     sen2sr_model_path: str = "./models/sen2sr"
     sen2sr_enabled: bool = True
+    sen2sr_use_local: bool = True
+
+    ml_risk_enabled: bool = True
+    ml_risk_model_path: str = "./models/ml_risk"
+    ml_risk_elevate_only: bool = True
+    ml_risk_confidence_min: float = 0.55
+
+    app_env: str = "development"
+    allow_open_registration: bool = True
+    registration_secret: str = ""
+    health_detail_enabled: bool = True
+    trusted_hosts: str = ""
+    baseline_build_on_request: bool = False
 
     pilot_crop: str = "wheat"
     pilot_district: str = "matiari"
@@ -37,6 +50,14 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_host_list(self) -> list[str]:
+        return [h.strip() for h in self.trusted_hosts.split(",") if h.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.lower() == "production"
 
     @property
     def resolved_gee_key_path(self) -> str:

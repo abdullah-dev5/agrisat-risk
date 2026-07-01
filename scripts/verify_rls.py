@@ -138,6 +138,25 @@ def main() -> int:
     print("Creating field under institution A (GEE required)...")
     field_id = create_field(token_a)
 
+    print("Waiting for background GEE analysis...")
+    for _ in range(120):
+        proc = httpx.get(
+            f"{API}/api/v1/fields/{field_id}/processing",
+            headers={"Authorization": f"Bearer {token_a}"},
+            timeout=30,
+        )
+        if proc.status_code == 200:
+            status = proc.json().get("status")
+            if status in ("ready", "idle"):
+                break
+            if status == "failed":
+                print(f"[FAIL] Field processing failed: {proc.json().get('error')}")
+                return 1
+        time.sleep(3)
+    else:
+        print("[FAIL] Field processing timed out after 6 minutes")
+        return 1
+
     print("Institution A can read own field...")
     own = get_field(token_a, field_id)
     if own.status_code != 200:

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, reportUrl } from '../lib/api';
-import { getAccessToken } from '../lib/supabase';
+import { api, downloadReport } from '../lib/api';
 import type { FieldDetail, RiskAssessment } from '../types';
 import { FieldsMap } from '../components/FieldsMap';
 import { RiskBadge } from '../components/RiskBadge';
 import { VegetationChart } from '../components/VegetationChart';
 import { FieldGeeImagery } from '../components/FieldGeeImagery';
+import { useFieldProcessing } from '../hooks/useFieldProcessing';
 import { LoadingScreen } from '../components/ui/LoadingScreen';
 import { TIER_LABELS } from '../lib/constants';
 
@@ -48,29 +48,35 @@ export function FieldDetailPage() {
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
 
-  function loadDetail(fieldId: string) {
-    setLoading(true);
+  const { status: procStatus, polling, startPolling } = useFieldProcessing(
+    id,
+    detail?.processing_status,
+    () => {
+      if (id) loadDetail(id, false);
+    },
+  );
+
+  function loadDetail(fieldId: string, showSpinner = true) {
+    if (showSpinner) setLoading(true);
     api.getFieldDetail(fieldId)
-      .then(setDetail)
+      .then((d) => {
+        setDetail(d);
+        if (d.processing_status === 'processing') startPolling();
+      })
       .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (showSpinner) setLoading(false);
+      });
   }
 
   useEffect(() => {
     if (id) loadDetail(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function downloadPdf() {
-    const token = await getAccessToken();
-    const res = await fetch(reportUrl(`/api/v1/reports/field/${id}/pdf`), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `field-${id}.pdf`;
-    a.click();
+    if (!id) return;
+    await downloadReport(`/api/v1/reports/field/${id}/pdf`, `field-${id}.pdf`);
   }
 
   async function handleReprocess() {
@@ -79,7 +85,7 @@ export function FieldDetailPage() {
     setError('');
     try {
       await api.reprocessField(id);
-      loadDetail(id);
+      startPolling();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Re-analysis failed');
     } finally {
@@ -87,8 +93,10 @@ export function FieldDetailPage() {
     }
   }
 
-  if (loading) return <LoadingScreen label="Loading field analysis…" />;
+  if (loading && !detail) return <LoadingScreen label="Loading field analysis…" />;
   if (!detail) return <p className="error">{error || 'Field not found'}</p>;
+
+  const isAnalyzing = polling || reprocessing || detail.processing_status === 'processing';
 
   const a = detail.current_assessment;
   const latestReading = detail.vegetation_readings.length
@@ -102,9 +110,15 @@ export function FieldDetailPage() {
   const pipelineLabel =
     pipelineSource === 'gee_live'
       ? 'Live GEE · Sentinel-1/2'
-      : pipelineSource === 'gee_error'
-        ? 'GEE unavailable — check backend credentials'
-        : undefined;
+      : pipelineSource === 'sen2sr_local'
+        ? 'Local SEN2SR · GEE patches'
+        : pipelineSource === 'sen2sr_gee'
+          ? 'Tier 2 · GEE weekly S2 composite'
+          : pipelineSource === 'gee_error'
+            ? 'GEE unavailable — check backend credentials'
+            : undefined;
+
+  const ml = detail.pipeline?.ml;
 
   const isSar = a?.primary_data_tier === 'tier3_sar';
   const showReprocessHint = needsReprocess(a);
@@ -136,7 +150,18 @@ export function FieldDetailPage() {
 
       {error && <p className="error">{error}</p>}
 
-      {a && (
+      {isAnalyzing && (
+        <div className="processing-banner card" role="status">
+          <strong>Satellite analysis in progress</strong>
+          <p>GEE vegetation fusion and risk scoring run in the background. This page updates automatically.</p>
+        </div>
+      )}
+
+      {procStatus?.status === 'failed' && (
+        <p className="error">{procStatus.error || 'Satellite analysis failed. Try Re-analyze field.'}</p>
+      )}
+
+      {a && !isAnalyzing && (
         <div className={`risk-brief${a.risk_tier === 'insufficient_data' ? ' risk-brief--insufficient' : ''}`}>
           <span className="eyebrow">Risk assessment</span>
           <p className="risk-brief-text">{a.explanation}</p>
@@ -159,7 +184,23 @@ export function FieldDetailPage() {
             <Link to="/guide#risk-scoring" className="guide-inline-link">How risk scoring works</Link>
             {' · '}
             <Link to="/guide#baseline" className="guide-inline-link">Understanding the baseline</Link>
+            {' · '}
+            <Link to="/guide#ml-layer" className="guide-inline-link">ML stress model</Link>
           </p>
+
+          {ml?.stress_probability != null && (
+            <div className="ml-insight">
+              <span className="eyebrow">ML stress model</span>
+              <p>
+                Gradient-boosted classifier (v{ml.model_version ?? '1'}) estimates{' '}
+                <strong>{(ml.stress_probability * 100).toFixed(0)}%</strong> crop-stress probability
+                {ml.predicted_tier && (
+                  <> · predicted tier: <strong>{ml.predicted_tier.replace('_', ' ')}</strong></>
+                )}
+                . Z-score rules remain primary; ML can elevate the tier when confidence is high.
+              </p>
+            </div>
+          )}
 
           <div className="risk-meta-grid">
             <div className="risk-meta-item">

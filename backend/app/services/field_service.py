@@ -92,6 +92,8 @@ def _field_response(sb, row: dict, risk_tier: str | None = None) -> FieldRespons
         resolution_warning=row.get("resolution_warning", False),
         pilot_district=row.get("pilot_district", "matiari"),
         current_risk_tier=risk_tier,
+        processing_status=row.get("processing_status"),
+        processing_error=row.get("processing_error"),
         created_at=row["created_at"],
     )
 
@@ -144,8 +146,13 @@ def create_field(
     row = _first_row(resp.data)
     if not row:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Field insert failed")
-    process_field(row["id"], settings)
-    return get_field(row["id"], institution_id)
+
+    from app.services.job_runner import enqueue_field_processing
+
+    enqueue_field_processing(row["id"], settings)
+    row["processing_status"] = "processing"
+    risk_tier = None
+    return _field_response(sb, row, risk_tier)
 
 
 def get_field(field_id: str, institution_id: str) -> FieldResponse:
@@ -238,9 +245,39 @@ def update_field(
         if table_updates:
             sb.table("fields").update(table_updates).eq("id", field_id).execute()
         if updates.get("_boundary_changed") or any(k in updates for k in ("sowing_date", "crop_type")):
-            process_field(field_id, settings)
+            from app.services.job_runner import enqueue_field_processing
+
+            enqueue_field_processing(field_id, settings)
 
     return get_field(field_id, institution_id)
+
+
+def get_processing_status(field_id: str, institution_id: str) -> dict:
+    sb = get_supabase_admin()
+    row = _require_field_row(
+        sb, field_id, institution_id, columns="id,processing_status,processing_error,processing_updated_at"
+    )
+    from app.services.job_runner import is_field_processing
+
+    status_value = row.get("processing_status") or "idle"
+    if is_field_processing(field_id):
+        status_value = "processing"
+    return {
+        "field_id": field_id,
+        "status": status_value,
+        "error": row.get("processing_error"),
+        "updated_at": row.get("processing_updated_at"),
+    }
+
+
+def request_reprocess(field_id: str, institution_id: str, settings: Settings) -> dict:
+    get_field(field_id, institution_id)
+    from app.services.job_runner import enqueue_field_processing, is_field_processing
+
+    if is_field_processing(field_id):
+        return {"message": "Analysis already in progress", "status": "processing"}
+    enqueue_field_processing(field_id, settings)
+    return {"message": "Re-analysis started", "status": "processing"}
 
 
 def get_field_detail(field_id: str, institution_id: str) -> dict:
@@ -337,18 +374,22 @@ def process_field(field_id: str, settings: Settings) -> None:
     pipeline_meta = fused_result.pipeline
 
     sb.table("vegetation_readings").delete().eq("field_id", field_id).execute()
-    for r in fused:
-        sb.table("vegetation_readings").insert({
-            "field_id": field_id,
-            "acquisition_date": r.acquisition_date.isoformat(),
-            "days_since_sowing": r.days_since_sowing,
-            "data_tier": r.data_tier.value,
-            "ndvi": r.ndvi,
-            "evi": r.evi,
-            "sar_index": r.sar_index,
-            "cloud_fraction": r.cloud_fraction,
-            "is_fused": True,
-        }).execute()
+    if fused:
+        reading_rows = [
+            {
+                "field_id": field_id,
+                "acquisition_date": r.acquisition_date.isoformat(),
+                "days_since_sowing": r.days_since_sowing,
+                "data_tier": r.data_tier.value,
+                "ndvi": r.ndvi,
+                "evi": r.evi,
+                "sar_index": r.sar_index,
+                "cloud_fraction": r.cloud_fraction,
+                "is_fused": True,
+            }
+            for r in fused
+        ]
+        sb.table("vegetation_readings").insert(reading_rows).execute()
 
     baseline_rows = ensure_district_baseline(
         sb,
@@ -460,9 +501,10 @@ def get_field_imagery(field_id: str, institution_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("GEE imagery generation failed for field %s", field_id)
+        logger.error("Imagery failed for field %s: %s", field_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Satellite imagery generation failed: {exc}",
+            detail="Satellite imagery is temporarily unavailable. Try again in a few minutes.",
         ) from exc
 
     with _IMAGERY_CACHE_LOCK:

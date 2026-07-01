@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, waitForFieldProcessing } from '../lib/api';
 import { parseBoundaryFile } from '../lib/boundaryParser';
 import { FieldsMap } from '../components/FieldsMap';
 import { SubmitOverlay } from '../components/ui/SubmitOverlay';
@@ -26,6 +26,7 @@ export function RegisterFieldPage() {
   const [sowingDate, setSowingDate] = useState('2025-11-15');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
   const [showLayerHelp, setShowLayerHelp] = useState(false);
 
   const currentStep = !polygon ? 1 : loading ? 3 : 2;
@@ -62,6 +63,12 @@ export function RegisterFieldPage() {
         farmer_ref_id: farmerRef || null,
         loan_ref_id: loanRef || null,
       });
+      setProcessingMessage('Running satellite analysis in the background…');
+      await waitForFieldProcessing(field.id, (s) => {
+        if (s.status === 'processing') {
+          setProcessingMessage('Fetching Sentinel imagery and computing risk score…');
+        }
+      });
       navigate(`/fields/${field.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register field');
@@ -75,10 +82,10 @@ export function RegisterFieldPage() {
       {loading && (
         <SubmitOverlay
           title="Registering field…"
-          message="Saving your boundary and running satellite vegetation analysis. This usually takes 30–90 seconds."
+          message={processingMessage || 'Saving boundary and starting satellite analysis.'}
           steps={[
             'Saving field boundary to database',
-            'Fetching Sentinel-2 NDVI and Sentinel-1 SAR (Google Earth Engine)',
+            'Queued: Sentinel-2 NDVI + Sentinel-1 SAR (Google Earth Engine)',
             'Computing baseline comparison and risk tier',
           ]}
         />

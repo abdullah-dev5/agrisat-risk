@@ -2,7 +2,14 @@ import { getAccessToken } from './supabase';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
 
-async function apiFetch<T>(path: string, options: RequestInit = {}, timeoutMs = 60_000): Promise<T> {
+export const API_TIMEOUT = {
+  default: 30_000,
+  imagery: 180_000,
+  report: 120_000,
+  processing: 15_000,
+} as const;
+
+async function apiFetch<T>(path: string, options: RequestInit = {}, timeoutMs: number = API_TIMEOUT.default): Promise<T> {
   const token = await getAccessToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -30,14 +37,17 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, timeoutMs = 
             : 'Request failed';
       throw new Error(message);
     }
+    if (res.status === 204) return undefined as T;
     return res.json();
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('Request timed out — GEE imagery can take up to 2 minutes on first load.');
+      throw new Error(
+        'Request timed out. Satellite analysis runs in the background — check field status or try again.',
+      );
     }
     if (err instanceof TypeError) {
       throw new Error(
-        'Could not reach the API — ensure the backend is running on port 8000 and refresh the page.',
+        'Could not reach the API — ensure the backend is running and refresh the page.',
       );
     }
     throw err;
@@ -56,17 +66,28 @@ export const api = {
     }),
   listFields: () => apiFetch<import('../types').Field[]>('/api/v1/fields'),
   getFieldDetail: (id: string) => apiFetch<import('../types').FieldDetail>(`/api/v1/fields/${id}/detail`),
+  getFieldProcessing: (id: string) =>
+    apiFetch<import('../types').FieldProcessingStatus>(
+      `/api/v1/fields/${id}/processing`,
+      {},
+      API_TIMEOUT.processing,
+    ),
   getFieldImagery: (id: string) =>
-    apiFetch<import('../types').FieldImagery>(`/api/v1/fields/${id}/imagery`, {}, 120_000),
+    apiFetch<import('../types').FieldImagery>(`/api/v1/fields/${id}/imagery`, {}, API_TIMEOUT.imagery),
   createField: (body: unknown) =>
     apiFetch<import('../types').Field>('/api/v1/fields', { method: 'POST', body: JSON.stringify(body) }),
   reprocessField: (id: string) =>
-    apiFetch<{ message: string }>(`/api/v1/fields/${id}/reprocess`, { method: 'POST' }),
+    apiFetch<{ message: string; status: string }>(
+      `/api/v1/fields/${id}/reprocess`,
+      { method: 'POST' },
+      API_TIMEOUT.processing,
+    ),
   portfolioSummary: () => apiFetch<import('../types').PortfolioSummary>('/api/v1/reports/portfolio/summary'),
-  registerInstitution: (body: unknown) =>
+  registerInstitution: (body: unknown, registrationSecret?: string) =>
     apiFetch<{ id: string; name: string }>('/api/v1/auth/register-institution', {
       method: 'POST',
       body: JSON.stringify(body),
+      headers: registrationSecret ? { 'X-Registration-Secret': registrationSecret } : {},
     }),
 };
 
@@ -79,16 +100,43 @@ export async function downloadReport(path: string, filename: string): Promise<vo
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { headers });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(typeof err.detail === 'string' ? err.detail : 'Download failed');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT.report);
+
+  try {
+    const res = await fetch(`${API_URL}${path}`, { headers, signal: controller.signal });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(typeof err.detail === 'string' ? err.detail : 'Download failed');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Report download timed out — try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+}
+
+export async function waitForFieldProcessing(
+  fieldId: string,
+  onProgress?: (status: import('../types').FieldProcessingStatus) => void,
+): Promise<import('../types').FieldProcessingStatus> {
+  const maxAttempts = 120;
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const s = await api.getFieldProcessing(fieldId);
+    onProgress?.(s);
+    if (s.status === 'ready' || s.status === 'idle') return s;
+    if (s.status === 'failed') throw new Error(s.error || 'Satellite analysis failed');
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  throw new Error('Analysis is taking longer than expected. Open the field page to check status.');
 }
