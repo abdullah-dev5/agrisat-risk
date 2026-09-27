@@ -11,6 +11,7 @@ export function useFieldProcessing(
   onReady?: () => void,
 ) {
   const [status, setStatus] = useState<FieldProcessingStatus | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
   const [polling, setPolling] = useState(
     initialStatus === 'processing' || !initialStatus,
   );
@@ -34,6 +35,7 @@ export function useFieldProcessing(
         const s = await api.getFieldProcessing(fieldId);
         if (cancelled) return;
         setStatus(s);
+        setPollError(null);
         polls.current += 1;
         if (s.status === 'ready' || s.status === 'idle') {
           setPolling(false);
@@ -43,8 +45,15 @@ export function useFieldProcessing(
         } else if (polls.current >= MAX_POLLS) {
           setPolling(false);
         }
-      } catch {
-        if (!cancelled) setPolling(false);
+      } catch (err) {
+        if (!cancelled) {
+          setPolling(false);
+          setPollError(
+            err instanceof Error
+              ? err.message
+              : 'Lost connection while checking analysis status.',
+          );
+        }
       }
     };
 
@@ -56,5 +65,14 @@ export function useFieldProcessing(
     };
   }, [fieldId, polling]);
 
-  return { status, polling, refresh, startPolling: () => setPolling(true) };
+  return {
+    status,
+    polling,
+    pollError,
+    refresh,
+    startPolling: () => {
+      setPollError(null);
+      setPolling(true);
+    },
+  };
 }

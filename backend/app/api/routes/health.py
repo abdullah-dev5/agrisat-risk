@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends
 
 from app.core.config import Settings, get_settings
 from app.core.security import sanitize_health_error
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -88,8 +92,12 @@ async def ml_health():
 
 
 @router.get("/gee")
-async def gee_health():
+async def gee_health(settings: Settings = Depends(get_settings)):
     """Check Google Earth Engine Tier 3 configuration and connectivity."""
     from app.services.tiers.gee_client import gee_health_probe
 
-    return gee_health_probe()
+    result = dict(gee_health_probe())
+    if result.get("connection") == "error" and not _detail_enabled(settings):
+        logger.warning("GEE health check error: %s", result.get("message"))
+        result["message"] = "error"
+    return result

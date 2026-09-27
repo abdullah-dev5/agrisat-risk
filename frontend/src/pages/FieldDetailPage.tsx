@@ -48,7 +48,7 @@ export function FieldDetailPage() {
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
 
-  const { status: procStatus, polling, startPolling } = useFieldProcessing(
+  const { status: procStatus, polling, pollError, startPolling } = useFieldProcessing(
     id,
     detail?.processing_status,
     () => {
@@ -159,6 +159,13 @@ export function FieldDetailPage() {
 
       {procStatus?.status === 'failed' && (
         <p className="error">{procStatus.error || 'Satellite analysis failed. Try Re-analyze field.'}</p>
+      )}
+
+      {!isAnalyzing && pollError && (
+        <p className="error">
+          Couldn't confirm analysis status ({pollError}). It may still be running — refresh the page or try
+          Re-analyze field.
+        </p>
       )}
 
       {a && !isAnalyzing && (

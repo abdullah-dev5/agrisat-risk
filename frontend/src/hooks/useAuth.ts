@@ -14,11 +14,17 @@ export function useAuth() {
   useEffect(() => {
     const sb = getSupabaseClient();
 
-    sb.auth.getSession().then(({ data }) => {
-      const s = data.session;
-      setUser(s?.user ? { id: s.user.id, email: s.user.email ?? '' } : null);
-      setLoading(false);
-    });
+    sb.auth
+      .getSession()
+      .then(({ data }) => {
+        const s = data.session;
+        setUser(s?.user ? { id: s.user.id, email: s.user.email ?? '' } : null);
+        setLoading(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setLoading(false);
+      });
 
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ? { id: session.user.id, email: session.user.email ?? '' } : null);

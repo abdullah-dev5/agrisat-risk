@@ -1,8 +1,10 @@
 # UI/UX Direction — Inspiration & Options
 
+> **Superseded / historical.** M9 shipped as the "Canopy" design system (see `docs/MODULE-PLAN.md`, commit `b20f435`) — the direction chosen was closest to Direction A below. This document is kept for its design rationale and inspiration links, not as a description of the current UI. For the shipped design, read the components under `frontend/src/components` and `frontend/src/index.css` directly.
+
 AgriSat Risk serves **loan officers and underwriters**, not farmers. The UI should feel like a **professional geospatial risk console** — credible to a microfinance bank or insurer — not a generic AI startup dashboard.
 
-**Current state:** Functional dark theme with standard layout. Redesign is **M9** in `MODULE-PLAN.md` — blocked until you pick a direction below.
+**Original state (pre-M9):** Functional dark theme with standard layout. Redesign was **M9** in `MODULE-PLAN.md`.
 
 ---
 
@@ -114,12 +116,6 @@ AgriSat Risk serves **loan officers and underwriters**, not farmers. The UI shou
 
 ---
 
-## What we need from you
+## Outcome (for the record)
 
-Reply with one of:
-
-1. **Letter** — A, B, C, or D (or mix: e.g. “C map + B cards”)
-2. **Reference URL** — any dashboard/site you want echoed
-3. **Constraints** — light vs dark, Urdu support now vs later, logo/colors if you have them
-
-Once chosen, M9 branch implements: design tokens, layout restructure, map styling, and component pass — without changing backend contracts.
+M9 implemented a direction close to **A — Institutional GIS console** (large map canvas, slim data panel, satellite basemaps, WCAG AA risk colors) as the "Canopy" design system, without changing backend contracts. Future redesign work should start from the shipped components rather than this brief.
