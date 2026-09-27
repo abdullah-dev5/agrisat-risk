@@ -149,7 +149,7 @@ def create_field(
 
     from app.services.job_runner import enqueue_field_processing
 
-    enqueue_field_processing(row["id"], settings)
+    enqueue_field_processing(row["id"], institution_id, settings)
     row["processing_status"] = "processing"
     risk_tier = None
     return _field_response(sb, row, risk_tier)
@@ -247,7 +247,7 @@ def update_field(
         if updates.get("_boundary_changed") or any(k in updates for k in ("sowing_date", "crop_type")):
             from app.services.job_runner import enqueue_field_processing
 
-            enqueue_field_processing(field_id, settings)
+            enqueue_field_processing(field_id, institution_id, settings)
 
     return get_field(field_id, institution_id)
 
@@ -276,7 +276,7 @@ def request_reprocess(field_id: str, institution_id: str, settings: Settings) ->
 
     if is_field_processing(field_id):
         return {"message": "Analysis already in progress", "status": "processing"}
-    enqueue_field_processing(field_id, settings)
+    enqueue_field_processing(field_id, institution_id, settings)
     return {"message": "Re-analysis started", "status": "processing"}
 
 
@@ -342,10 +342,16 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
     }
 
 
-def process_field(field_id: str, settings: Settings) -> None:
+def process_field(field_id: str, institution_id: str, settings: Settings) -> None:
     sb = get_supabase_admin()
     field = _first_row(
-        sb.table("fields").select("*").eq("id", field_id).limit(1).execute().data
+        sb.table("fields")
+        .select("*")
+        .eq("id", field_id)
+        .eq("institution_id", institution_id)
+        .limit(1)
+        .execute()
+        .data
     )
     if not field:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
