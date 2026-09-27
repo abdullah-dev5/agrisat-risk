@@ -7,20 +7,28 @@ Satellite-based parametric crop risk platform for agricultural lenders and insur
 ## Architecture
 
 ```
-frontend/     React 18 + TypeScript + Leaflet dashboard (pnpm)
+frontend/     React 19 + TypeScript + Leaflet dashboard (pnpm)
 backend/      Python FastAPI — tier adapters, fusion, risk scoring
 supabase/     PostgreSQL + PostGIS, Auth, RLS, report storage
 ```
+
+See [Architecture](docs/ARCHITECTURE.md) for the full system diagram, module map, and data flow.
 
 ### Three-tier data stack (FR-3.4)
 
 | Tier | Source | Role |
 |------|--------|------|
-| 1 | PlanetScope (E&R Program) | 3m optical — preferred when approved |
-| 2 | SEN2SR + Sentinel-2 | 2.5m optical fallback |
-| 3 | Sentinel-1 SAR + Sentinel-2 + CHIRPS | Always-available cloud-independent baseline |
+| 1 | PlanetScope (E&R Program) | 3m optical — deferred (M5), pending license |
+| 2 | SEN2SR (local super-resolution model) + Sentinel-2 weekly composite fallback | 2.5m optical |
+| 3 | Sentinel-1 SAR + Sentinel-2 + CHIRPS rainfall (via Google Earth Engine) | Always-available, cloud-independent baseline — **required, no synthetic fallback** |
 
-Core risk flagging works on Tier 3 alone (FR-3.7).
+Core risk flagging works on Tier 3 alone (FR-3.7); a live GEE service account is required for all field processing.
+
+### Beyond the three tiers
+
+- **Async processing** — registering or reprocessing a field returns immediately; satellite fetch/fusion/risk scoring runs in a background worker and the frontend polls `GET /fields/{id}/processing` until it's ready.
+- **ML risk layer (M12)** — a gradient-boosted classifier can elevate (never downgrade) the z-score-based risk tier when its confidence is high enough; toggled via `ML_RISK_ENABLED`.
+- **Tenant isolation (M1)** — every institution's data is scoped by `institution_id` at the application layer on every query; see [Architecture](docs/ARCHITECTURE.md#tenant-isolation) for how this relates to the Postgres RLS policies also defined in the schema.
 
 ## Quick start
 
@@ -73,11 +81,19 @@ With the backend running: http://localhost:8000/docs
 
 ## Documentation
 
+- [Architecture](docs/ARCHITECTURE.md) — system diagram, module map, data flow, tenant-isolation design
 - [Module plan](docs/MODULE-PLAN.md) — delivery order and acceptance criteria (MVP complete)
 - [Supabase setup](docs/SUPABASE-SETUP.md) — **start here after clone (M11)**
+- [Google Earth Engine setup](docs/GEE-SETUP.md) — service account and GCP project configuration for Tier 3
 - [Production deployment](docs/PRODUCTION.md) — Gunicorn, Docker, security, timeouts
-- [Git workflow](docs/GIT-WORKFLOW.md) — branch and commit conventions
+- [Contributing](CONTRIBUTING.md) — dev workflow, branch/commit conventions, manual verification gate
+- [Changelog](CHANGELOG.md) — notable changes by milestone
 - [SRS traceability](docs/SRS-traceability.md) — requirement → code map
+- [UI/UX inspiration](docs/UI-UX-INSPIRATION.md) — historical design-direction options from before the M9 Canopy redesign shipped
+- [Audit findings](docs/AUDIT-FINDINGS.md) — prioritized backlog of known flaws and improvement ideas
+- [Feature roadmap](docs/FEATURE-ROADMAP.md) — feasibility-checked future features, and which accelerators/evaluators to target
+- [Free vs. paid resources](docs/FREE-VS-PAID-RESOURCES.md) — what's buildable at $0 today vs. what needs budget, and when
+- [User flow & what the numbers mean](docs/USER-FLOW.md) — plain-language walkthrough of the product and honest accuracy caveats
 - **In-app Guide** — http://localhost:5173/guide (plain-language + technical tutorials)
 
 ## Verify stack
