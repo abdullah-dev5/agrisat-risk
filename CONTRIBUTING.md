@@ -36,9 +36,25 @@ Full conventions live in [`docs/GIT-WORKFLOW.md`](docs/GIT-WORKFLOW.md). Summary
 - Feature branches: `feat/m{N}-{short-name}` (module work) or `fix/{short-description}` / `chore/{short-name}` otherwise.
 - Commit format: `<type>(<scope>): <short summary>`, types `feat`/`fix`/`chore`/`docs`/`refactor`/`test`.
 
-## There is no CI yet — run these manually before opening a PR
+## Automated checks (CI)
 
-The project currently has **no automated test suite and no CI pipeline** (tracked in [`docs/AUDIT-FINDINGS.md`](docs/AUDIT-FINDINGS.md) as the top backlog item). Until that changes, these scripts are the manual gate — run whichever apply to your change against a real (dev/staging) Supabase + GEE setup:
+`.github/workflows/ci.yml` runs on every push to `main` and every PR:
+
+- **Backend:** `cd backend && pip install -r requirements-dev.txt && python -m pytest` — unit tests in `backend/tests/` over pure-logic modules (risk scoring, geometry, security helpers) plus mocked-Supabase tests for the reconciliation sweep and the report-generation batching fix. No live Supabase/GEE credentials needed or used.
+- **Frontend:** `pnpm install --frozen-lockfile`, then `pnpm run lint` (ESLint), `pnpm run test` (Vitest + React Testing Library — boundary parsing, map-status logic, `RiskBadge`), then `pnpm run build` (`tsc -b && vite build`).
+
+Run the same commands locally before pushing:
+
+```bash
+cd backend && python -m pytest
+cd frontend && pnpm run lint && pnpm run test && pnpm run build
+```
+
+`pnpm run format` / `pnpm run format:check` (Prettier) exist but aren't run in CI yet — the existing codebase predates Prettier and hasn't been reformatted, so `format:check` would fail on unrelated pre-existing style, not a real regression. Run `pnpm run format` deliberately, as its own commit, if you want to adopt it.
+
+## What CI does *not* cover — still needs the manual scripts
+
+CI tests logic in isolation, not integration with real Supabase/GEE. For anything touching those paths, still run the relevant scripts by hand against a real (dev/staging) setup before opening a PR:
 
 ```bash
 python scripts/verify_supabase.py    # DB connectivity + schema sanity
@@ -48,8 +64,6 @@ python scripts/bootstrap_ml_models.py  # SEN2SR (M4) + ML risk (M12) model weigh
 python scripts/test_e2e_flows.py     # end-to-end: Supabase Auth → backend API → DB
 python scripts/test_stack.py         # general stack smoke test
 ```
-
-For frontend changes, there's no lint/test script (`frontend/package.json` only has `dev`/`build`/`preview`) — at minimum run `pnpm build` to catch TypeScript errors (`tsconfig.json` is strict) before opening a PR.
 
 ## Before you touch tenant-scoped data access
 
