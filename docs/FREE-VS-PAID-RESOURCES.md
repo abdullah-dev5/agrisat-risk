@@ -59,6 +59,13 @@ The line that actually matters: **noncommercial-tier users may not charge or rec
 | **GitHub Actions CI** | ✅ free tier is generous at this project's scale (public repos: unlimited; private repos: a large monthly minutes allowance) | Only becomes a cost center at a scale far beyond a pilot |
 | **Hosting/compute for the backend** | Depends on where it's deployed — not researched here since it's deployment-specific | Budget this separately when picking a production host |
 
+## 5. Tools evaluated and not adopted (recorded so they aren't re-explored later)
+
+| Tool | What it is | Verdict |
+|---|---|---|
+| **[GeoLibre](https://github.com/opengeos/GeoLibre)** (opengeos) | Free, MIT-licensed, actively maintained browser/desktop/Jupyter GIS platform — MapLibre GL rendering, DuckDB-WASM spatial SQL, 1,000+ WASM geoprocessing tools | ❌ Not a production dependency — confirmed via its `package.json` (`"private": true`, internal monorepo `packages/*`) that it isn't published to npm as an embeddable component; it's a standalone app you run, not a library you install into AgriSat's frontend. ✅ Worth using informally as a free, zero-install tool for the team to visually QA field boundaries/imagery exports during development — not worth building any integration around. |
+| **[geemap](https://github.com/gee-community/geemap)** (same `opengeos`/gee-community ecosystem) | Free, MIT-licensed Python package for interactive Google Earth Engine exploration in Jupyter | ✅ A better fit than GeoLibre for this stack specifically — pip-installable, works directly with the `earthengine-api` already in `backend/requirements.txt`. Recommended as the team's interactive-exploration tool while scoping roadmap items 1.2 (SAR soil moisture) and 1.3 (cloud gap-filling) in `FEATURE-ROADMAP.md` — not a runtime dependency of the FastAPI service itself, just a dev-time aid. |
+
 ## Bottom line
 
 Everything on the **"Now" and most of the "Next" horizon** in `FEATURE-ROADMAP.md` can be built and even demoed to evaluators at $0 — the free tiers above are real, current, and not artificially crippled for prototyping. The two genuine budget lines to plan for, in order of urgency, are:

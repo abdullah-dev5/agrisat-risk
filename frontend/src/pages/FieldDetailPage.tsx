@@ -157,8 +157,10 @@ export function FieldDetailPage() {
         </div>
       )}
 
-      {procStatus?.status === 'failed' && (
-        <p className="error">{procStatus.error || 'Satellite analysis failed. Try Re-analyze field.'}</p>
+      {(procStatus?.status === 'failed' || (!isAnalyzing && detail.processing_status === 'failed')) && (
+        <p className="error">
+          {procStatus?.error || detail.processing_error || 'Satellite analysis failed. Try Re-analyze field.'}
+        </p>
       )}
 
       {!isAnalyzing && pollError && (

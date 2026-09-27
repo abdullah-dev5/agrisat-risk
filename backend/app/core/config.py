@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     trusted_hosts: str = ""
     baseline_build_on_request: bool = False
 
+    # If a field's processing_status stays "processing" longer than this (e.g. the
+    # worker process crashed mid-job), the reconciliation sweep marks it "failed"
+    # so it stops looking stuck forever. Should comfortably exceed the slowest
+    # realistic job — the frontend itself gives up polling after ~6 minutes.
+    job_stale_timeout_minutes: int = 15
+    job_reconcile_interval_seconds: int = 300
+
     pilot_crop: str = "wheat"
     pilot_district: str = "matiari"
     pilot_region_bbox: str = "68.0,25.2,69.2,26.1"
