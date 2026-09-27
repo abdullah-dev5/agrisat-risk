@@ -501,7 +501,6 @@ def get_field_imagery(field_id: str, institution_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("GEE imagery generation failed for field %s", field_id)
-        logger.error("Imagery failed for field %s: %s", field_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Satellite imagery is temporarily unavailable. Try again in a few minutes.",

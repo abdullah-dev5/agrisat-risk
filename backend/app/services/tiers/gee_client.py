@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date, timedelta
-from functools import lru_cache
 
 from shapely import wkt as parse_wkt
 from pathlib import Path
@@ -16,6 +16,13 @@ from app.services.vegetation_index import sar_index_from_vv_db
 logger = logging.getLogger(__name__)
 
 _GEE_INITIALIZED = False
+
+_GEE_MAX_RETRIES = 2
+_GEE_RETRY_BACKOFF_SECONDS = 1.5
+
+_HEALTH_PROBE_TTL_SECONDS = 60
+_health_probe_cache: dict | None = None
+_health_probe_cached_at = 0.0
 
 
 class GEEError(RuntimeError):
@@ -70,9 +77,44 @@ def _end_date_exclusive(end: date) -> str:
     return (end + timedelta(days=1)).isoformat()
 
 
-@lru_cache(maxsize=1)
+def _get_info(ee_object, *, context: str):
+    """Call .getInfo() with a small bounded retry for transient failures
+    (timeouts, rate limits) — a single flaky call shouldn't fail a whole
+    tier fetch. Not used for the health probe, which should reflect the
+    current live state immediately rather than mask it behind retries."""
+    last_exc: Exception | None = None
+    for attempt in range(_GEE_MAX_RETRIES + 1):
+        try:
+            return ee_object.getInfo()
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= _GEE_MAX_RETRIES:
+                break
+            wait = _GEE_RETRY_BACKOFF_SECONDS * (2**attempt)
+            logger.warning(
+                "%s failed (attempt %d/%d): %s — retrying in %.1fs",
+                context, attempt + 1, _GEE_MAX_RETRIES + 1, exc, wait,
+            )
+            time.sleep(wait)
+    raise GEEError(f"{context} failed after {_GEE_MAX_RETRIES + 1} attempts: {last_exc}") from last_exc
+
+
 def gee_health_probe() -> dict:
-    """Lightweight GEE connectivity check (cached per process)."""
+    """Lightweight GEE connectivity check, cached for a short TTL rather than
+    forever — a real health check should recover once GEE (or credentials)
+    come back, not keep reporting the first-ever result for the process
+    lifetime."""
+    global _health_probe_cache, _health_probe_cached_at
+    now = time.monotonic()
+    if _health_probe_cache is not None and (now - _health_probe_cached_at) < _HEALTH_PROBE_TTL_SECONDS:
+        return _health_probe_cache
+    result = _run_gee_health_probe()
+    _health_probe_cache = result
+    _health_probe_cached_at = now
+    return result
+
+
+def _run_gee_health_probe() -> dict:
     result = {
         "configured": is_gee_configured(),
         "initialized": False,
@@ -171,8 +213,8 @@ def fetch_tier3_from_gee(
             "vv_db": stats.get("VV"),
         })
 
-    optical_feats = s2.map(optical_feature).getInfo().get("features", [])
-    sar_feats = s1.map(sar_feature).getInfo().get("features", [])
+    optical_feats = _get_info(s2.map(optical_feature), context="Tier 3 Sentinel-2 fetch").get("features", [])
+    sar_feats = _get_info(s1.map(sar_feature), context="Tier 3 Sentinel-1 fetch").get("features", [])
 
     by_date: dict[date, TierReading] = {}
 
@@ -253,7 +295,7 @@ def fetch_tier2_composite_from_gee(
             .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 25))
             .map(mask_s2)
         )
-        count = coll.size().getInfo()
+        count = _get_info(coll.size(), context="Tier 2 weekly composite count")
         if count == 0:
             week_start += timedelta(days=7)
             continue
@@ -264,13 +306,16 @@ def fetch_tier2_composite_from_gee(
             "2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))",
             {"NIR": composite.select("B8"), "RED": composite.select("B4"), "BLUE": composite.select("B2")},
         ).rename("EVI")
-        stats = ndvi.addBands(evi).reduceRegion(
-            reducer=ee.Reducer.mean(),
-            geometry=region,
-            scale=10,
-            maxPixels=1e9,
-            bestEffort=True,
-        ).getInfo()
+        stats = _get_info(
+            ndvi.addBands(evi).reduceRegion(
+                reducer=ee.Reducer.mean(),
+                geometry=region,
+                scale=10,
+                maxPixels=1e9,
+                bestEffort=True,
+            ),
+            context="Tier 2 weekly composite stats",
+        )
 
         ndvi_val = stats.get("NDVI")
         if ndvi_val is not None:
@@ -302,13 +347,16 @@ def fetch_chirps_rainfall(boundary_wkt: str, start: date, end: date) -> Rainfall
         .select("precipitation")
     )
     period_mm = float(
-        period_coll.sum().reduceRegion(
-            reducer=ee.Reducer.mean(),
-            geometry=region,
-            scale=5566,
-            maxPixels=1e9,
-            bestEffort=True,
-        ).get("precipitation").getInfo()
+        _get_info(
+            period_coll.sum().reduceRegion(
+                reducer=ee.Reducer.mean(),
+                geometry=region,
+                scale=5566,
+                maxPixels=1e9,
+                bestEffort=True,
+            ).get("precipitation"),
+            context="CHIRPS period rainfall",
+        )
         or 0
     )
 
@@ -325,13 +373,16 @@ def fetch_chirps_rainfall(boundary_wkt: str, start: date, end: date) -> Rainfall
             .filterDate(hist_start.isoformat(), _end_date_exclusive(hist_end))
             .select("precipitation")
         )
-        hist_val = hist_coll.sum().reduceRegion(
-            reducer=ee.Reducer.mean(),
-            geometry=region,
-            scale=5566,
-            maxPixels=1e9,
-            bestEffort=True,
-        ).get("precipitation").getInfo()
+        hist_val = _get_info(
+            hist_coll.sum().reduceRegion(
+                reducer=ee.Reducer.mean(),
+                geometry=region,
+                scale=5566,
+                maxPixels=1e9,
+                bestEffort=True,
+            ).get("precipitation"),
+            context=f"CHIRPS historical rainfall ({years_back}y back)",
+        )
         if hist_val is not None:
             hist_totals.append(float(hist_val))
 
