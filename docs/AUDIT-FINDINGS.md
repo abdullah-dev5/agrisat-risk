@@ -41,14 +41,14 @@ For the system-level picture these findings sit inside, see [`ARCHITECTURE.md`](
 8. **[FIXED 2026-09-27] Silent polling failure in `useFieldProcessing`.**
    `frontend/src/hooks/useFieldProcessing.ts` — the poll `catch` block just called `setPolling(false)` with no error surfaced. Fixed: the hook now exposes a `pollError` state (set on a failed poll request, cleared on the next successful one or when polling restarts), and `FieldDetailPage.tsx` renders it as an inline error message when analysis isn't otherwise in progress.
 
-9. **Registration flow duplicate-submission edge case.**
-   `frontend/src/pages/RegisterFieldPage.tsx` — `handleSubmit` creates the field via `api.createField()` and only afterward awaits `waitForFieldProcessing` (up to 6 minutes). If that wait times out or the connection drops, the shown error is generic, but the field record already exists server-side. The user has no way from that screen to know it was created, and may resubmit and create a duplicate field. Fix: on timeout, surface the created field's ID/link instead of a bare error, or check for an existing field with matching boundary/name before allowing resubmission.
+9. **[FIXED 2026-09-27] Registration flow duplicate-submission edge case.**
+   `frontend/src/pages/RegisterFieldPage.tsx` — `handleSubmit` used to create the field via `api.createField()` and only afterward await `waitForFieldProcessing` (up to 6 minutes), so a timeout left the user on a generic error with no link back to a field that already existed server-side. Fixed by navigating to `/fields/{id}` immediately once `createField()` resolves — the field detail page already polls processing status and handles in-progress/failed states (see #2/#8), so there's no reason to wait on the registration page at all anymore.
 
-10. **GEE health probe cached forever.**
-    `backend/app/services/tiers/gee_client.py:73` — `@lru_cache(maxsize=1)` on `gee_health_probe()` means `/health/gee` reports the *first-ever* result (success or failure) for the lifetime of the process, not a live check. Fix: cache with a short TTL (e.g. re-probe if older than 60s) instead of unconditionally forever.
+10. **[FIXED 2026-09-27] GEE health probe cached forever.**
+    `backend/app/services/tiers/gee_client.py` — `@lru_cache(maxsize=1)` on `gee_health_probe()` meant `/health/gee` reported the *first-ever* result for the lifetime of the process. Fixed: replaced with a manual TTL cache (60s) so the health check recovers once GEE/credentials come back instead of being stuck on the first result until a restart.
 
-11. **No retry/backoff for transient GEE failures.**
-    Nothing in `backend/app/services/tiers/gee_client.py` retries a timed-out or rate-limited GEE call — a single transient failure fails the whole tier fetch for that job. Low effort, meaningful reliability win: wrap GEE calls with a small bounded retry (e.g. 2 retries, exponential backoff) for known-transient error types.
+11. **[FIXED 2026-09-27] No retry/backoff for transient GEE failures.**
+    `backend/app/services/tiers/gee_client.py` had no retry around `.getInfo()` calls, so a single timed-out or rate-limited call failed the whole tier fetch. Fixed: added `_get_info()`, a bounded retry helper (2 retries, exponential backoff starting at 1.5s) wrapping every data-fetching `.getInfo()` call in `fetch_tier3_from_gee`, `fetch_tier2_composite_from_gee`, and `fetch_chirps_rainfall`. The health probe (#10) deliberately stays unretried since it should reflect current live state immediately, not mask a real outage behind retries.
 
 12. **Shallow input validation in `backend/app/schemas/domain.py`.**
     - **[FIXED 2026-09-27]** `admin_email`, `contact_email`, and `InviteUserRequest.email` were plain `str` — switched to Pydantic's `EmailStr` (added `email-validator` to `backend/requirements.txt` and installed it, since `EmailStr` requires it at import time). Malformed emails are now rejected with a 422 at the API layer instead of reaching Supabase Auth first.
@@ -61,24 +61,25 @@ For the system-level picture these findings sit inside, see [`ARCHITECTURE.md`](
 14. **Migration process is fragile.**
     `supabase/migrations/001`–`006` are hand-numbered plain SQL files with no migration framework (Alembic/Flyway-equivalent), no down-migrations, and no migration-ledger table visible in the schema. Workable at 6 migrations; will get harder to reason about as the schema grows. Consider adopting Supabase's own migration tracking conventions more strictly, or a lightweight ledger table, before the next few migrations land.
 
-15. **Duplicated error handling / double logging in `get_field_imagery`.**
-    `backend/app/services/field_service.py:498-508` has its own bespoke try/except → 502 logic that duplicates what the global exception handlers in `main.py` already do, and logs the error twice (`logger.exception` + `logger.error`). Low-risk cleanup: remove the local handler and let it bubble to the shared handler.
+15. **[FIXED 2026-09-27, revised] Duplicated error handling / double logging in `get_field_imagery`.**
+    `backend/app/services/field_service.py` had a bespoke try/except → 502 handler that logged the same error twice (`logger.exception` + `logger.error`). On closer look, the local handler itself is worth keeping — it returns a more specific 502 with a user-friendly message, better than falling through to the global handler's generic 500 — so only the redundant second log call was removed, not the handler.
 
 ## Low / cleanup
 
-16. **Frontend dead code.** `frontend/src/lib/constants.ts` exports `MAP_TILE_URL`/`MAP_ATTRIBUTION` (a CARTO street-tile config) that's no longer imported anywhere — `mapBasemaps.ts`'s `BASEMAPS` array has its own equivalent `street` entry. Leftover from before the multi-basemap refactor.
-17. **Vestigial empty directories.** `frontend/src/mock/` and `frontend/src/mock/data/` exist on disk (untracked) — the demo-data-removal commit deleted the files but not the folders.
-18. **Dead tsconfig stub.** `frontend/tsconfig.app.json` is a near-empty stub referencing `tsconfig.json`, but `tsconfig.json` already contains the full compiler options directly and isn't set up with `composite`/project references — `tsconfig.app.json` appears unused.
-19. **No ESLint/Prettier configuration** for the frontend despite the strict TypeScript setup — nothing enforces style/lint rules today beyond the compiler itself.
-20. **Duplicate list+table DOM.** `FieldsListPage`/`DashboardPage` render both a card list and a full `<table>` for the same data, toggled via CSS `display:none` media queries (`index.css` ~lines 354-364) rather than conditional rendering. Not an accessibility bug (hidden content is excluded from the a11y tree) but it's duplicate markup a leaner implementation could avoid.
-21. **One-row-at-a-time baseline inserts.** `backend/app/services/baseline.py:178-185` inserts baseline rows in a loop with a per-row try/except for unique-constraint violations, rather than a single bulk insert. Baseline builds are infrequent (offline, per `docs/PRODUCTION.md`), so impact is low.
-22. **`VegetationChart` recomputes derived data every render** without memoization (`chartData`/`nearestBaseline`) — given realistic per-field time-series sizes (a season of readings), unlikely to matter in practice; worth a `useMemo` pass only if profiling ever shows it matters.
-23. **README said "React 18"** while `frontend/package.json` pins `react@^19.0.0` — fixed in this pass; watch for the same drift on future dependency bumps.
+16. **[FIXED 2026-09-27] Frontend dead code.** Removed the unused `MAP_TILE_URL`/`MAP_ATTRIBUTION` exports from `frontend/src/lib/constants.ts` — superseded by `mapBasemaps.ts`'s `BASEMAPS` array.
+17. **[FIXED 2026-09-27] Vestigial empty directories.** Removed the empty `frontend/src/mock/` and `frontend/src/mock/data/` directories (they held no files; git never tracked them).
+18. **[FIXED 2026-09-27] Dead tsconfig stub.** Removed `frontend/tsconfig.app.json` — confirmed nothing referenced it (`tsc -b` already builds directly from `tsconfig.json`, verified working both before and after removal).
+19. **No ESLint/Prettier configuration** for the frontend despite the strict TypeScript setup — nothing enforces style/lint rules today beyond the compiler itself. **Still open** — larger than the others in this section since it needs config decisions (rule set, whether to auto-fix existing code) rather than a pure deletion; tracked separately alongside the CI work in #1.
+20. **Duplicate list+table DOM.** `FieldsListPage`/`DashboardPage` render both a card list and a full `<table>` for the same data, toggled via CSS `display:none` media queries (`index.css` ~lines 354-364) rather than conditional rendering. Not an accessibility bug (hidden content is excluded from the a11y tree) but it's duplicate markup a leaner implementation could avoid. **Still open** — deliberately left alone: it's a visual/layout refactor that needs to be checked in a running browser to avoid a regression, not a safe blind edit.
+21. **[FIXED 2026-09-27] One-row-at-a-time baseline inserts.** `backend/app/services/baseline.py` now dedupes on the table's unique key (`crop_type`, `pilot_district`, `days_since_sowing`, `primary_tier`) in Python, matching the previous per-row "skip duplicate" behavior, then does a single batched `.insert()` instead of one round-trip per row.
+22. **[FIXED 2026-09-27] `VegetationChart` recomputes derived data every render.** Wrapped `chartData` in `useMemo`, keyed on `[readings, baseline]`.
+23. **[FIXED 2026-09-27] README said "React 18"** while `frontend/package.json` pins `react@^19.0.0` — corrected; watch for the same drift on future dependency bumps.
 
 ## Suggested order of attack
 
-1. ✅ Ship the docs refresh (this pass) so the backlog above is visible and the two contradicted docs stop misleading readers.
-2. ✅ Land the small, low-risk fixes: #7 (`useAuth` `.catch()`), #5 (`/health/gee` sanitization), #3 (N+1 batching in `report_service.py`), #8 (surface polling errors), #12's `EmailStr` tightening. `crop_type`/boundary validation in #12 stayed open (product decision, not a pure bug).
+1. ✅ Ship the docs refresh so the backlog above is visible and the two contradicted docs stop misleading readers.
+2. ✅ Land the small, low-risk fixes: #7, #5, #3, #8, #12's `EmailStr` tightening.
 3. ✅ Reconciliation sweep for stuck `processing` fields (#2, single-process crash recovery) — cross-replica dedupe for horizontal scaling stays open.
-4. **Next up:** scope and build the automated test suite + CI pipeline (#1) as its own dedicated effort — it's large enough to deserve its own plan rather than being folded into incremental fixes.
-5. Cleanup items (#16-23) whenever convenient; they carry no urgency.
+4. ✅ Remaining Medium/Low items: #9, #10, #11, #15, #16, #17, #18, #21, #22, #23.
+5. **Next up:** scope and build the automated test suite + CI pipeline (#1), including ESLint/Prettier (#19) — the two remaining structural gaps, large enough to deserve dedicated, careful setup rather than incremental patching.
+6. **Deliberately still open, not urgent:** #4 (confirm `ALLOW_OPEN_REGISTRATION` is `false` in real deployments), #13 (latent IDOR trap in `process_field` — safe today, worth hardening before adding new callers), #14 (migration framework fragility — a process change, not a quick fix), #20 (duplicate list+table DOM — needs browser verification before touching).
