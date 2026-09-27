@@ -73,9 +73,9 @@ Multi-tenant separation ("institution" = tenant) is enforced **at the applicatio
 
 ## Known limitations
 
+- **Job queue is single-process only.** `job_runner.py`'s `ThreadPoolExecutor`-based queue now recovers from its own crashes (a background sweep marks fields stuck in `processing` past a timeout as `failed`, since 2026-09-27 — see `docs/AUDIT-FINDINGS.md` #2), but it still doesn't dedupe across multiple backend replicas. Horizontal scaling still needs a durable queue (Redis/etc.) per `docs/PRODUCTION.md`.
 - **Google Earth Engine's free tier is noncommercial-only.** The entire Tier 3 pipeline runs on GEE, which is free today because the project has no paying customer yet — GEE's noncommercial terms explicitly prohibit fee-for-service use. This needs a paid Earth Engine commercial account (or a migration to the Copernicus Data Space Ecosystem) before any institution is billed for a AgriSat output. See [`docs/FREE-VS-PAID-RESOURCES.md`](FREE-VS-PAID-RESOURCES.md).
 
-- **Job queue is in-memory and per-process** (`job_runner.py`): it doesn't dedupe across multiple backend replicas, and if the process crashes mid-job, the field is left in `processing_status = "processing"` with no automatic reconciliation. Acceptable at pilot scale (single Gunicorn instance, 2 workers); revisit (e.g. Redis + a real task queue) before horizontal scaling. See `docs/PRODUCTION.md`.
 - **No automated test suite or CI** — verification today is a set of manual scripts (`scripts/verify_supabase.py`, `verify_rls.py`, `verify_gee.py`, `test_e2e_flows.py`) run by hand against live credentials. See `docs/AUDIT-FINDINGS.md` and `CONTRIBUTING.md`.
 - **No retry/backoff for transient GEE failures** — a single failed GEE call fails the tier fetch for that job.
 
