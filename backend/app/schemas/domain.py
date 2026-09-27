@@ -1,17 +1,17 @@
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.enums import DataTier, FieldStatus, RiskTier, UserRole
 
 
 class InstitutionRegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=200)
-    contact_email: str
+    contact_email: EmailStr
     contact_phone: str | None = None
     admin_full_name: str | None = None
-    admin_email: str
+    admin_email: EmailStr
     admin_password: str = Field(min_length=8)
 
 
@@ -23,7 +23,7 @@ class InstitutionResponse(BaseModel):
 
 
 class InviteUserRequest(BaseModel):
-    email: str
+    email: EmailStr
     full_name: str | None = None
     role: UserRole = UserRole.LOAN_OFFICER
 

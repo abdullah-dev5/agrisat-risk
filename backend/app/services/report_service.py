@@ -76,9 +76,26 @@ def generate_field_pdf(field_id: str, institution_id: str) -> bytes:
     return buffer.getvalue()
 
 
+def _current_assessments_by_field(sb, field_ids: list[str], columns: str) -> dict[str, dict]:
+    """Batch-load current risk assessments for a set of fields (avoids one query per field)."""
+    if not field_ids:
+        return {}
+    resp = (
+        sb.table("risk_assessments")
+        .select(columns)
+        .in_("field_id", field_ids)
+        .eq("is_current", True)
+        .execute()
+    )
+    return {row["field_id"]: row for row in resp.data}
+
+
 def generate_portfolio_csv(institution_id: str) -> str:
     sb = get_supabase_admin()
     fields = sb.table("fields").select("*").eq("institution_id", institution_id).eq("status", "active").execute().data
+    assessments = _current_assessments_by_field(
+        sb, [f["id"] for f in fields], "field_id, risk_tier, z_score, explanation"
+    )
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -88,16 +105,7 @@ def generate_portfolio_csv(institution_id: str) -> str:
     ])
 
     for f in fields:
-        assessment = (
-            sb.table("risk_assessments")
-            .select("*")
-            .eq("field_id", f["id"])
-            .eq("is_current", True)
-            .limit(1)
-            .execute()
-            .data
-        )
-        a = assessment[0] if assessment else {}
+        a = assessments.get(f["id"], {})
         writer.writerow([
             f["id"],
             f.get("name", ""),
@@ -126,6 +134,9 @@ def generate_portfolio_pdf(institution_id: str) -> bytes:
         .data
         or []
     )
+    assessments = _current_assessments_by_field(
+        sb, [f["id"] for f in fields], "field_id, risk_tier, z_score, explanation"
+    )
 
     risk_counts: dict[str, int] = {
         "normal": 0,
@@ -137,16 +148,7 @@ def generate_portfolio_pdf(institution_id: str) -> bytes:
     rows: list[tuple[str, str, str, str, str]] = []
 
     for f in fields:
-        assessment = (
-            sb.table("risk_assessments")
-            .select("risk_tier, z_score, explanation")
-            .eq("field_id", f["id"])
-            .eq("is_current", True)
-            .limit(1)
-            .execute()
-            .data
-        )
-        a = assessment[0] if assessment else {}
+        a = assessments.get(f["id"], {})
         tier = a.get("risk_tier", "normal")
         risk_counts[tier] = risk_counts.get(tier, 0) + 1
         label = f.get("name") or f.get("farmer_ref_id") or f["id"][:8]
