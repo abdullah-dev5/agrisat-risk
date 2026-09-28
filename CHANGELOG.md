@@ -2,10 +2,14 @@
 
 Notable changes to AgriSat Risk, grouped by milestone. Format loosely follows [Keep a Changelog](https://keepachangelog.com/); dates are commit dates on `main`.
 
-## Unreleased — Documentation refresh + first audit-backlog fixes
+## Unreleased — Documentation refresh, full audit-backlog closure, test suite + CI, live E2E testing
 
-- Added `docs/ARCHITECTURE.md`, `docs/AUDIT-FINDINGS.md`, `docs/FEATURE-ROADMAP.md`, `docs/FREE-VS-PAID-RESOURCES.md`, `docs/USER-FLOW.md`, `CONTRIBUTING.md`; corrected stale references in `README.md`, `docs/SRS-traceability.md`, `docs/UI-UX-INSPIRATION.md`.
-- Fixed: N+1 queries in portfolio CSV/PDF generation (`report_service.py`), unauthenticated info-disclosure on `/health/gee`, unhandled promise rejection in `useAuth`, silent polling failures in `useFieldProcessing` (now surfaced on `FieldDetailPage`), and missing email format validation on registration/invite endpoints (`EmailStr`).
+- Added `docs/ARCHITECTURE.md`, `docs/AUDIT-FINDINGS.md`, `docs/FEATURE-ROADMAP.md`, `docs/FREE-VS-PAID-RESOURCES.md`, `docs/USER-FLOW.md`, `docs/WALKTHROUGH.md`, `CONTRIBUTING.md`; corrected stale references in `README.md`, `docs/SRS-traceability.md`, `docs/UI-UX-INSPIRATION.md`.
+- Added a real backend test suite (pytest, `backend/tests/`), a frontend unit test suite (Vitest + React Testing Library), ESLint + Prettier, and a GitHub Actions CI pipeline running all of it on every push/PR — closing the single biggest structural gap identified in the audit.
+- Added a live end-to-end test suite (Playwright, `frontend/e2e/`) that runs against the real stack (Supabase + Google Earth Engine) — not mocks. It found two real bugs that neither code review nor the mocked test suite could have caught:
+  - **JWT verification rejected every login under minor clock skew** — `jwt_verify.py` had zero leeway on the `iat` claim, so any deployment with even small clock drift would reject every single login. Fixed with a 30s leeway.
+  - **`RegisterInstitutionPage`/`LoginPage` inputs had no accessible label** — `<label>`/`<input>` pairs weren't connected via `htmlFor`/`id`, a real screen-reader gap on the two account-entry screens. Fixed.
+- Fixed essentially every other item in `docs/AUDIT-FINDINGS.md` that was fixable by editing code: N+1 queries in portfolio report generation, the in-memory job queue's crash recovery (a reconciliation sweep for stuck `processing` fields), a latent IDOR trap in `process_field`, GEE health-check caching/retry behavior, unauthenticated info-disclosure on `/health/gee`, several frontend UX/reliability gaps, and a round of dead-code cleanup. See the doc for the full, itemized list — what's left open is explicitly a process/product decision, not an oversight.
 - Confirmed as an explicit, correct-for-now decision: Google Earth Engine's noncommercial tier is appropriate while AgriSat has no paying institution and is operating as research/development — revisit before any commercial launch (see `docs/FREE-VS-PAID-RESOURCES.md`).
 
 ## 2026-07-01 — Production hardening, M4 SEN2SR, M12 ML

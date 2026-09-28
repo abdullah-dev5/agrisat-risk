@@ -16,6 +16,7 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+*.tsbuildinfo
 
 # IDE
 .vscode/
@@ -30,6 +31,13 @@ Thumbs.db
 *.log
 .cache/
 .pytest_cache/
+
+# Playwright E2E artifacts (frontend/e2e/)
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/e2e/screenshots/
+frontend/.playwright/
 
 # Earth Engine credentials (never commit)
 *-gee-key.json

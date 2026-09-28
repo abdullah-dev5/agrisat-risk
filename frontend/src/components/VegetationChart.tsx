@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Area, ComposedChart,
@@ -13,25 +14,29 @@ const FOREST = '#1B3D36';
 const WHEAT = '#B8954A';
 const FOREST_MUTED = 'rgba(61, 107, 90, 0.15)';
 
-export function VegetationChart({ readings, baseline }: Props) {
-  const nearestBaseline = (day: number) => {
-    if (!baseline.length) return undefined;
-    return baseline.reduce((best, b) =>
-      Math.abs(b.days_since_sowing - day) < Math.abs(best.days_since_sowing - day) ? b : best,
-    );
-  };
+function nearestBaseline(baseline: BaselinePoint[], day: number) {
+  if (!baseline.length) return undefined;
+  return baseline.reduce((best, b) =>
+    Math.abs(b.days_since_sowing - day) < Math.abs(best.days_since_sowing - day) ? b : best,
+  );
+}
 
-  const chartData = readings.map((r) => {
-    const b = nearestBaseline(r.days_since_sowing);
-    const value = r.ndvi ?? r.sar_index ?? 0;
-    return {
-      day: r.days_since_sowing,
-      value,
-      baselineMean: b?.mean_index,
-      baselineUpper: b ? b.mean_index + b.std_index : undefined,
-      baselineLower: b ? b.mean_index - b.std_index : undefined,
-    };
-  });
+export function VegetationChart({ readings, baseline }: Props) {
+  const chartData = useMemo(
+    () =>
+      readings.map((r) => {
+        const b = nearestBaseline(baseline, r.days_since_sowing);
+        const value = r.ndvi ?? r.sar_index ?? 0;
+        return {
+          day: r.days_since_sowing,
+          value,
+          baselineMean: b?.mean_index,
+          baselineUpper: b ? b.mean_index + b.std_index : undefined,
+          baselineLower: b ? b.mean_index - b.std_index : undefined,
+        };
+      }),
+    [readings, baseline],
+  );
 
   return (
     <div className="chart-wrap">

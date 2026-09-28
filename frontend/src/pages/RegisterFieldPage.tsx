@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, waitForFieldProcessing } from '../lib/api';
+import { api } from '../lib/api';
 import { parseBoundaryFile } from '../lib/boundaryParser';
 import { FieldsMap } from '../components/FieldsMap';
 import { SubmitOverlay } from '../components/ui/SubmitOverlay';
@@ -26,7 +26,6 @@ export function RegisterFieldPage() {
   const [sowingDate, setSowingDate] = useState('2025-11-15');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [processingMessage, setProcessingMessage] = useState('');
   const [showLayerHelp, setShowLayerHelp] = useState(false);
 
   const currentStep = !polygon ? 1 : loading ? 3 : 2;
@@ -63,16 +62,16 @@ export function RegisterFieldPage() {
         farmer_ref_id: farmerRef || null,
         loan_ref_id: loanRef || null,
       });
-      setProcessingMessage('Running satellite analysis in the background…');
-      await waitForFieldProcessing(field.id, (s) => {
-        if (s.status === 'processing') {
-          setProcessingMessage('Fetching Sentinel imagery and computing risk score…');
-        }
-      });
+      // The field now exists server-side the moment createField() resolves.
+      // Hand off to the field detail page immediately rather than waiting here
+      // for satellite processing to finish — that page already polls
+      // /fields/{id}/processing and shows in-progress/failed states. Waiting
+      // on this page risked a timeout leaving the user stuck on a generic
+      // error with no link back to a field that had already been created,
+      // inviting an accidental duplicate submission.
       navigate(`/fields/${field.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register field');
-    } finally {
       setLoading(false);
     }
   }
@@ -82,7 +81,7 @@ export function RegisterFieldPage() {
       {loading && (
         <SubmitOverlay
           title="Registering field…"
-          message={processingMessage || 'Saving boundary and starting satellite analysis.'}
+          message="Saving boundary and queuing satellite analysis."
           steps={[
             'Saving field boundary to database',
             'Queued: Sentinel-2 NDVI + Sentinel-1 SAR (Google Earth Engine)',

@@ -22,6 +22,14 @@ def _jwks_client(supabase_url: str):
 def verify_supabase_token(token: str, settings: Settings) -> dict[str, Any]:
     """Decode and validate a Supabase Auth JWT."""
     audience = "authenticated"
+    # Tolerate minor clock drift between this server and Supabase's auth
+    # server (NTP hiccups, VM clock skew) -- without this, a token whose
+    # `iat` is even a few seconds "in the future" from this machine's clock
+    # is rejected outright (jwt.exceptions.ImmatureSignatureError), which
+    # would reject *every* fresh login on a machine with any clock drift,
+    # not just malformed/expired tokens. 30s matches common practice (e.g.
+    # Supabase's own client libraries default to similar tolerances).
+    leeway_seconds = 30
     jwks_error: Exception | None = None
 
     if settings.supabase_url:
@@ -35,6 +43,7 @@ def verify_supabase_token(token: str, settings: Settings) -> dict[str, Any]:
                 signing_key.key,
                 algorithms=["ES256", "RS256"],
                 audience=audience,
+                leeway=leeway_seconds,
             )
         except Exception as exc:
             jwks_error = exc
@@ -48,6 +57,7 @@ def verify_supabase_token(token: str, settings: Settings) -> dict[str, Any]:
                 settings.supabase_jwt_secret,
                 algorithms=["HS256"],
                 audience=audience,
+                options={"leeway": leeway_seconds},
             )
         except JWTError as exc:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc

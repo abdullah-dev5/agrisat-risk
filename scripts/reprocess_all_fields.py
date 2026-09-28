@@ -23,7 +23,7 @@ def main() -> int:
         return 1
 
     sb = get_supabase_admin()
-    resp = sb.table("fields").select("id, name, farmer_ref_id").eq("status", "active").execute()
+    resp = sb.table("fields").select("id, name, farmer_ref_id, institution_id").eq("status", "active").execute()
     fields = resp.data or []
 
     if not fields:
@@ -38,7 +38,7 @@ def main() -> int:
         label = row.get("name") or row.get("farmer_ref_id") or row["id"][:8]
         print(f"  -> {label} ({row['id']})...", flush=True)
         try:
-            process_field(row["id"], settings)
+            process_field(row["id"], row["institution_id"], settings)
             print("    OK")
         except Exception as exc:
             failed += 1

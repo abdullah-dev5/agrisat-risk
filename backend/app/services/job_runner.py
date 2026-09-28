@@ -45,8 +45,16 @@ def is_field_processing(field_id: str) -> bool:
         return field_id in _active
 
 
-def enqueue_field_processing(field_id: str, settings: Settings | None = None) -> bool:
-    """Schedule GEE fusion + risk scoring. Returns False if already running."""
+def enqueue_field_processing(
+    field_id: str, institution_id: str, settings: Settings | None = None
+) -> bool:
+    """Schedule GEE fusion + risk scoring. Returns False if already running.
+
+    Requires institution_id so process_field can verify ownership itself
+    (docs/AUDIT-FINDINGS.md #13) — every current caller already validates
+    ownership before enqueuing, but this closes the gap for any future caller
+    that doesn't, rather than relying solely on caller discipline.
+    """
     settings = settings or get_settings()
 
     with _lock:
@@ -61,7 +69,7 @@ def enqueue_field_processing(field_id: str, settings: Settings | None = None) ->
         try:
             from app.services.field_service import process_field
 
-            process_field(field_id, settings)
+            process_field(field_id, institution_id, settings)
             set_processing_status(field_id, "ready")
         except Exception as exc:
             logger.exception("Field processing failed for %s", field_id)
