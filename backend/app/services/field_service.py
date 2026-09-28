@@ -59,6 +59,27 @@ def _first_row(data: Any) -> dict[str, Any] | None:
     return data
 
 
+def _validate_crop_type(crop_type: str, settings: Settings) -> None:
+    """Reject anything but the configured pilot crop.
+
+    Not just a technical tightening: the baseline/risk pipeline is only
+    ever built for settings.pilot_crop -- scripts/build_district_baseline.py
+    has no other crop path, and confirmed live, every row in baseline_stats
+    is crop_type='wheat'. Accepting any other crop_type silently would run a
+    real GEE job (real cost, real quota) only to land on
+    INSUFFICIENT_DATA after the fact; rejecting it immediately with a clear
+    message is strictly better for the same outcome.
+    """
+    if crop_type.strip().lower() != settings.pilot_crop.strip().lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Only '{settings.pilot_crop}' is supported in this pilot — "
+                f"no historical baseline exists for '{crop_type}'."
+            ),
+        )
+
+
 def _fetch_boundary_geojson(sb, field_id: str) -> dict[str, Any]:
     try:
         resp = sb.rpc("field_boundary_geojson", {"p_field_id": field_id}).execute()
@@ -104,6 +125,8 @@ def create_field(
     user_id: str,
     settings: Settings,
 ) -> FieldResponse:
+    _validate_crop_type(payload.crop_type, settings)
+
     try:
         geojson = geojson_polygon(payload.boundary_geojson)
         area = compute_area_hectares(geojson)
@@ -216,6 +239,7 @@ def update_field(
     if payload.name is not None:
         updates["name"] = payload.name
     if payload.crop_type is not None:
+        _validate_crop_type(payload.crop_type, settings)
         updates["crop_type"] = payload.crop_type
     if payload.sowing_date is not None:
         updates["sowing_date"] = payload.sowing_date.isoformat()
