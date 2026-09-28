@@ -40,6 +40,14 @@ export function MapStatusOverlay({
 
   const status = getMapStatus(activeBasemap, zoom, loading);
   const drawHint = drawMode ? getDrawHint(vertexCount, finished, activeBasemap) : null;
+  const headline = drawHint ?? (loading ? 'Tiles still downloading — see progress bar above' : status.headline);
+
+  // Dismissible: a user can close this banner if it's in the way. Track
+  // dismissal by the exact message shown, not a plain boolean, so a *new*
+  // status (e.g. finishing the boundary, switching layers) still shows up
+  // rather than staying hidden forever after one dismissal.
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const isDismissed = dismissed === headline;
 
   return createPortal(
     <>
@@ -54,16 +62,22 @@ export function MapStatusOverlay({
         </div>
       )}
 
-      {(!loading || drawMode) && (
+      {(!loading || drawMode) && !isDismissed && (
         <div
           className={`map-status-banner map-status-banner--${loading ? 'loading' : status.quality}`}
           role="status"
           aria-live="polite"
         >
+          <button
+            type="button"
+            className="map-status-banner-close"
+            aria-label="Dismiss this message"
+            onClick={() => setDismissed(headline)}
+          >
+            ×
+          </button>
           <div className="map-status-banner-main">
-            <span className="map-status-banner-headline">
-              {drawHint ?? (loading ? 'Tiles still downloading — see progress bar above' : status.headline)}
-            </span>
+            <span className="map-status-banner-headline">{headline}</span>
             {!drawHint && !loading && status.detail && (
               <span className="map-status-banner-detail">{status.detail}</span>
             )}
