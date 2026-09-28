@@ -48,7 +48,7 @@ export function FieldDetailPage() {
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState(false);
 
-  const { status: procStatus, polling, pollError, startPolling } = useFieldProcessing(
+  const { status: procStatus, polling, pollError, startPolling, clearPollError } = useFieldProcessing(
     id,
     detail?.processing_status,
     () => {
@@ -61,7 +61,15 @@ export function FieldDetailPage() {
     api.getFieldDetail(fieldId)
       .then((d) => {
         setDetail(d);
-        if (d.processing_status === 'processing') startPolling();
+        if (d.processing_status === 'processing') {
+          startPolling();
+        } else {
+          // A prior poll error's message (if any) is now stale -- we have a
+          // definitive resolved status (ready/failed) from this fresh
+          // fetch, so don't leave "couldn't confirm status" showing
+          // alongside a result that actually did resolve.
+          clearPollError();
+        }
       })
       .catch((e) => setError(e.message))
       .finally(() => {
