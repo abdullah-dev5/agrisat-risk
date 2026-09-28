@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { BASEMAPS } from '../src/lib/mapBasemaps';
 
 // This project is ESM ("type": "module" in package.json), so __dirname
 // isn't available -- derive it from import.meta.url instead.
@@ -46,10 +47,20 @@ test('register institution, register a field, verify dashboard and responsive fi
     await expect(page.getByText('Portfolio overview')).toBeVisible({ timeout: 15_000 });
   });
 
-  await test.step('Register a field via GeoJSON upload', async () => {
+  await test.step('Map layer switcher has one entry per basemap, no duplicates', async () => {
+    // Regression guard: a BaseLayer wrapping two sibling TileLayers (the old
+    // "hybrid" pattern) registers as two duplicate radio entries instead of
+    // one combined layer -- caught live, fixed in MapBasemapLayers.tsx.
     await page.getByRole('link', { name: '+ Register field' }).click();
     await expect(page).toHaveURL(/\/fields\/new/);
+    await page.locator('.leaflet-control-layers').click();
+    const labels = await page.locator('.leaflet-control-layers-list label').allInnerTexts();
+    expect(labels).toHaveLength(BASEMAPS.length);
+    expect(new Set(labels).size).toBe(labels.length);
+    await page.locator('.leaflet-control-layers').click(); // close it again
+  });
 
+  await test.step('Register a field via GeoJSON upload', async () => {
     await page.getByRole('button', { name: 'Upload file' }).click();
     await page
       .locator('input[type="file"]')

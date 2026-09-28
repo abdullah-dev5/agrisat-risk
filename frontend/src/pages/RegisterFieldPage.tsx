@@ -166,7 +166,7 @@ export function RegisterFieldPage() {
             <div className="map-layer-help">
               <p><strong>Satellite (Esri)</strong> — Use for drawing field boundaries. Sharp at Z15–17.</p>
               <p><strong>Sentinel-2 (EOX)</strong> — Crop monitoring context (~10 m). Slow to load; blur above Z15 is normal (not still loading).</p>
-              <p><strong>Hybrid</strong> — Satellite plus place names. <strong>Street</strong> — District overview only.</p>
+              <p><strong>Hybrid</strong> — Satellite plus place names. <strong>Street</strong> — District overview only. <strong>Map</strong> — Standard road map with town/village names, best for figuring out where a field actually is.</p>
               <p className="map-layer-help-note">Switch layers with the stack icon (top-right of map). Watch the status banner at the bottom of the map.</p>
             </div>
           )}
