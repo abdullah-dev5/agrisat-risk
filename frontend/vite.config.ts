@@ -8,6 +8,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/setupTests.ts',
+    // Scope to unit tests under src/ -- e2e/ holds Playwright specs (a
+    // different test runner/API), and Vitest's default glob would otherwise
+    // pick them up too and fail on them.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
   server: {
     host: '127.0.0.1',
