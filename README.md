@@ -96,6 +96,7 @@ With the backend running: http://localhost:8000/docs
 - [Feature roadmap](docs/FEATURE-ROADMAP.md) — feasibility-checked future features, and which accelerators/evaluators to target
 - [Free vs. paid resources](docs/FREE-VS-PAID-RESOURCES.md) — what's buildable at $0 today vs. what needs budget, and when
 - [User flow & what the numbers mean](docs/USER-FLOW.md) — plain-language walkthrough of the product and honest accuracy caveats
+- [Live walkthrough](docs/WALKTHROUGH.md) — real screenshots from an actual run against the live stack (Supabase + GEE)
 - **In-app Guide** — http://localhost:5173/guide (plain-language + technical tutorials)
 
 ## Automated tests
