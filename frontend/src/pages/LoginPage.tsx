@@ -46,12 +46,12 @@ export function LoginPage() {
           <p className="subtitle">Access your institution&apos;s risk dashboard</p>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+              <label htmlFor="login-email">Email</label>
+              <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="form-group">
-              <label>Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+              <label htmlFor="login-password">Password</label>
+              <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
             </div>
             {error && <p className="error">{error}</p>}
             <button type="submit" disabled={loading} style={{ width: '100%', marginTop: '0.5rem' }}>
