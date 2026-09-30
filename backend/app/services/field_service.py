@@ -59,6 +59,27 @@ def _first_row(data: Any) -> dict[str, Any] | None:
     return data
 
 
+def _validate_crop_type(crop_type: str, settings: Settings) -> None:
+    """Reject anything but the configured pilot crop.
+
+    Not just a technical tightening: the baseline/risk pipeline is only
+    ever built for settings.pilot_crop -- scripts/build_district_baseline.py
+    has no other crop path, and confirmed live, every row in baseline_stats
+    is crop_type='wheat'. Accepting any other crop_type silently would run a
+    real GEE job (real cost, real quota) only to land on
+    INSUFFICIENT_DATA after the fact; rejecting it immediately with a clear
+    message is strictly better for the same outcome.
+    """
+    if crop_type.strip().lower() != settings.pilot_crop.strip().lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Only '{settings.pilot_crop}' is supported in this pilot — "
+                f"no historical baseline exists for '{crop_type}'."
+            ),
+        )
+
+
 def _fetch_boundary_geojson(sb, field_id: str) -> dict[str, Any]:
     try:
         resp = sb.rpc("field_boundary_geojson", {"p_field_id": field_id}).execute()
@@ -104,6 +125,8 @@ def create_field(
     user_id: str,
     settings: Settings,
 ) -> FieldResponse:
+    _validate_crop_type(payload.crop_type, settings)
+
     try:
         geojson = geojson_polygon(payload.boundary_geojson)
         area = compute_area_hectares(geojson)
@@ -149,7 +172,7 @@ def create_field(
 
     from app.services.job_runner import enqueue_field_processing
 
-    enqueue_field_processing(row["id"], settings)
+    enqueue_field_processing(row["id"], institution_id, settings)
     row["processing_status"] = "processing"
     risk_tier = None
     return _field_response(sb, row, risk_tier)
@@ -216,6 +239,7 @@ def update_field(
     if payload.name is not None:
         updates["name"] = payload.name
     if payload.crop_type is not None:
+        _validate_crop_type(payload.crop_type, settings)
         updates["crop_type"] = payload.crop_type
     if payload.sowing_date is not None:
         updates["sowing_date"] = payload.sowing_date.isoformat()
@@ -247,7 +271,7 @@ def update_field(
         if updates.get("_boundary_changed") or any(k in updates for k in ("sowing_date", "crop_type")):
             from app.services.job_runner import enqueue_field_processing
 
-            enqueue_field_processing(field_id, settings)
+            enqueue_field_processing(field_id, institution_id, settings)
 
     return get_field(field_id, institution_id)
 
@@ -276,7 +300,7 @@ def request_reprocess(field_id: str, institution_id: str, settings: Settings) ->
 
     if is_field_processing(field_id):
         return {"message": "Analysis already in progress", "status": "processing"}
-    enqueue_field_processing(field_id, settings)
+    enqueue_field_processing(field_id, institution_id, settings)
     return {"message": "Re-analysis started", "status": "processing"}
 
 
@@ -342,10 +366,16 @@ def get_field_detail(field_id: str, institution_id: str) -> dict:
     }
 
 
-def process_field(field_id: str, settings: Settings) -> None:
+def process_field(field_id: str, institution_id: str, settings: Settings) -> None:
     sb = get_supabase_admin()
     field = _first_row(
-        sb.table("fields").select("*").eq("id", field_id).limit(1).execute().data
+        sb.table("fields")
+        .select("*")
+        .eq("id", field_id)
+        .eq("institution_id", institution_id)
+        .limit(1)
+        .execute()
+        .data
     )
     if not field:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Field not found")
@@ -501,7 +531,6 @@ def get_field_imagery(field_id: str, institution_id: str) -> dict:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("GEE imagery generation failed for field %s", field_id)
-        logger.error("Imagery failed for field %s: %s", field_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Satellite imagery is temporarily unavailable. Try again in a few minutes.",

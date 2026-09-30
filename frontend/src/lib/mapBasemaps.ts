@@ -1,6 +1,6 @@
 /** Basemap tile layers for field registration and portfolio maps. */
 
-export type BasemapId = 'street' | 'satellite' | 'hybrid' | 'sentinel';
+export type BasemapId = 'street' | 'satellite' | 'hybrid' | 'sentinel' | 'roadmap';
 
 export interface BasemapConfig {
   id: BasemapId;
@@ -49,11 +49,18 @@ export const BASEMAPS: BasemapConfig[] = [
   {
     id: 'street',
     label: 'Street',
-    description: 'Light street map for district overview',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OSM &copy; CARTO',
-    maxZoom: 20,
-    subdomains: 'abcd',
+    description: 'Light minimal map for district overview',
+    url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri — Source: Esri, HERE, Garmin, (c) OpenStreetMap contributors, and the GIS user community',
+    maxZoom: 16,
+  },
+  {
+    id: 'roadmap',
+    label: 'Map',
+    description: 'Standard road map with town/village names, roads and landmarks — best for figuring out where you are',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri — Source: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, (c) OpenStreetMap contributors, GIS User Community',
+    maxZoom: 19,
   },
 ];
 

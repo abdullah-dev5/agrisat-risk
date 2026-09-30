@@ -63,10 +63,26 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
+@app.on_event("startup")
+async def on_startup():
+    from app.services.job_runner import start_reconciliation_loop
+
+    start_reconciliation_loop(settings)
+
+    if settings.is_production and settings.allow_open_registration:
+        logger.warning(
+            "ALLOW_OPEN_REGISTRATION is true in a production environment — "
+            "anyone can self-register a new institution + admin account. "
+            "Set ALLOW_OPEN_REGISTRATION=false after bootstrapping the first "
+            "institution (see docs/PRODUCTION.md)."
+        )
+
+
 @app.on_event("shutdown")
 async def on_shutdown():
-    from app.services.job_runner import shutdown_executor
+    from app.services.job_runner import shutdown_executor, stop_reconciliation_loop
 
+    stop_reconciliation_loop()
     shutdown_executor()
 
 

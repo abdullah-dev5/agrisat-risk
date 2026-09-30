@@ -8,7 +8,17 @@ const MAX_POLLS = 120; // 6 minutes
 export function useFieldProcessing(
   fieldId: string | undefined,
   initialStatus?: string | null,
-  onReady?: () => void,
+  // Fires whenever polling stops for ANY reason (ready, failed, max-polls
+  // timeout, or a poll request itself erroring) -- not just success. The
+  // caller's `detail.processing_status` is otherwise a stale snapshot from
+  // whenever it was first fetched, so without this, isAnalyzing-style
+  // checks in the caller can stay stuck on "processing" forever even after
+  // the job genuinely finished (or failed) on the server, if a single poll
+  // request happens to hit a transient network error. Found live: a real
+  // field finished successfully in ~80s, but one transient "server
+  // disconnected" poll error froze the UI on "processing" for the rest of
+  // a 4-minute wait, since nothing ever re-fetched the field's real status.
+  onSettled?: () => void,
 ) {
   const [status, setStatus] = useState<FieldProcessingStatus | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
@@ -16,8 +26,8 @@ export function useFieldProcessing(
     initialStatus === 'processing' || !initialStatus,
   );
   const polls = useRef(0);
-  const onReadyRef = useRef(onReady);
-  onReadyRef.current = onReady;
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
 
   const refresh = useCallback(async () => {
     if (!fieldId) return null;
@@ -39,11 +49,13 @@ export function useFieldProcessing(
         polls.current += 1;
         if (s.status === 'ready' || s.status === 'idle') {
           setPolling(false);
-          onReadyRef.current?.();
+          onSettledRef.current?.();
         } else if (s.status === 'failed') {
           setPolling(false);
+          onSettledRef.current?.();
         } else if (polls.current >= MAX_POLLS) {
           setPolling(false);
+          onSettledRef.current?.();
         }
       } catch (err) {
         if (!cancelled) {
@@ -53,6 +65,11 @@ export function useFieldProcessing(
               ? err.message
               : 'Lost connection while checking analysis status.',
           );
+          // A single failed poll request is often transient (a network
+          // blip, not the job itself failing) -- refresh the field detail
+          // once so the UI reflects whatever the server's real state
+          // actually is, instead of freezing on a stale "processing" view.
+          onSettledRef.current?.();
         }
       }
     };
@@ -74,5 +91,10 @@ export function useFieldProcessing(
       setPollError(null);
       setPolling(true);
     },
+    // For the caller to call once it has independently confirmed a
+    // definitive (non-"processing") status after a poll error settled --
+    // otherwise a transient error's message would keep showing even once
+    // the real outcome (success or failure) is known and displayed.
+    clearPollError: () => setPollError(null),
   };
 }

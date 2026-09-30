@@ -66,8 +66,9 @@ export function RegisterInstitutionPage() {
               ['admin_password', 'Password * (min 8 characters)'],
             ].map(([key, label]) => (
               <div className="form-group" key={key}>
-                <label>{label}</label>
+                <label htmlFor={`register-institution-${key}`}>{label}</label>
                 <input
+                  id={`register-institution-${key}`}
                   type={key.includes('password') ? 'password' : key.includes('email') ? 'email' : 'text'}
                   value={form[key as keyof typeof form]}
                   onChange={(e) => update(key, e.target.value)}

@@ -676,11 +676,34 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.25rem;
   max-width: min(36rem, calc(100% - 2rem));
-  padding: 0.5rem 0.9rem;
+  padding: 0.5rem 1.75rem 0.5rem 0.9rem;
   border-radius: var(--radius-md);
   pointer-events: none;
   text-align: center;
   box-shadow: var(--shadow-md);
+}
+
+.map-status-banner-close {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.35rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.map-status-banner-close:hover {
+  opacity: 1;
 }
 
 .map-status-banner-main {
@@ -804,15 +827,41 @@ textarea:focus-visible {
 }
 
 .map-container .leaflet-control-layers-expanded {
-  padding: 0.5rem 0.65rem !important;
-  background: rgba(252, 250, 245, 0.96) !important;
+  padding: 0.45rem 0.5rem !important;
+  max-width: 15rem;
+  background: rgba(252, 250, 245, 0.97) !important;
   backdrop-filter: blur(8px);
 }
 
+/* Leaflet's own <label>/<input> markup inherits the site-wide uppercase
+   form-label style (index.css:132) by default -- reset it here so the layer
+   list reads as a compact, normal-case menu instead of a shouty block list. */
 .map-container .leaflet-control-layers-list label {
-  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.32rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
   font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--ink);
+  cursor: pointer;
+}
+
+.map-container .leaflet-control-layers-list label:hover {
+  background: rgba(27, 61, 54, 0.06);
+}
+
+.map-container .leaflet-control-layers-selector {
+  margin: 0;
+  accent-color: var(--forest);
+}
+
+.map-container .leaflet-control-layers-separator {
+  margin: 0.3rem 0.2rem;
 }
 
 .map-container .leaflet-control-zoom {

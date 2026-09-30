@@ -175,14 +175,22 @@ def ensure_district_baseline(
         "pilot_district", pilot_district
     ).execute()
 
+    # Dedupe on the table's unique key (crop_type, pilot_district, days_since_sowing,
+    # primary_tier) before a single bulk insert — build_gee_baseline shouldn't produce
+    # collisions in practice, but keeping first-wins here matches the previous
+    # per-row insert's "skip on 23505" behavior instead of letting a bulk insert fail
+    # outright on a duplicate.
+    seen_keys: set[tuple] = set()
+    payloads = []
     for b in rows:
-        payload = {"crop_type": crop_type, "pilot_district": pilot_district, **b}
-        try:
-            sb.table("baseline_stats").insert(payload).execute()
-        except Exception as exc:
-            if "23505" in str(exc):
-                continue
-            raise
+        key = (b.get("days_since_sowing"), b.get("primary_tier"))
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        payloads.append({"crop_type": crop_type, "pilot_district": pilot_district, **b})
+
+    if payloads:
+        sb.table("baseline_stats").insert(payloads).execute()
 
     return (
         sb.table("baseline_stats")

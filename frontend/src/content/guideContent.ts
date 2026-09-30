@@ -320,7 +320,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       },
       {
         heading: 'Register field',
-        plain: 'Draw polygon on map; minimum ~0.2 ha recommended; enter sowing date for wheat.',
+        plain: 'Draw polygon on map; minimum ~0.2 ha recommended; enter sowing date for wheat. Switch basemaps with the stack icon (top-right of the map) — Satellite for sharp boundary tracing, Map for confirming which town/village a field is actually near, Sentinel-2 or Hybrid for crop context, Street for a district overview.',
       },
       {
         heading: 'Team (admins)',
@@ -355,6 +355,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
             label: 'Interpret SAR carefully',
             plain: 'Radar measures moisture and surface roughness — useful in cloudy seasons but not identical to NDVI.',
             technical: 'Tier 3 SAR explanation appended in assess_risk() when primary_data_tier is tier3_sar.',
+          },
+          {
+            label: 'Confirm the location before trusting a flag',
+            plain: 'Switch to the Map layer and check the field actually sits where you expect — a boundary accidentally drawn over a river, road, or the wrong parcel will show a real anomaly, just not a crop one.',
+            technical: 'Field boundary validation is geometric only (Polygon type + area threshold) — there is no automated land-cover check, so a mis-drawn AOI over non-cropland still produces a statistically valid but agronomically meaningless z-score.',
           },
         ],
       },
